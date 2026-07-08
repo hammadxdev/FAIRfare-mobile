@@ -80,6 +80,10 @@ export default function ResultsScreen({ route, navigation }) {
           onViewBreakdown={handleViewBreakdown}
         />
       ))}
+
+      <Text style={styles.disclaimer}>
+        Fares are estimated for comparison only and may differ from the actual app price.
+      </Text>
     </ScrollView>
   );
 }
@@ -161,5 +165,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 0.5,
+  },
+  disclaimer: {
+    fontSize: 11,
+    color: colors.muted,
+    textAlign: "center",
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
   },
 });

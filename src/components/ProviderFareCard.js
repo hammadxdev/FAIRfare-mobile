@@ -46,7 +46,9 @@ export default function ProviderFareCard({ result, onOpenApp, onViewBreakdown })
           <Text style={styles.secondaryButtonText}>Fare Breakdown</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.primaryButton} activeOpacity={0.8} onPress={() => onOpenApp(result)}>
-          <Text style={styles.primaryButtonText}>Open App</Text>
+          <Text style={styles.primaryButtonText} numberOfLines={1}>
+            Book from {provider.displayName}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>

@@ -12,7 +12,7 @@ const mockCompareFaresResponse = {
   durationMin: 15,
   results: [
     {
-      provider: { id: 2, name: "quickride", displayName: "QuickRide" },
+      provider: { id: 2, name: "quickride", displayName: "Yango" },
       fare: 169,
       etaMin: 6,
       isCheapest: true,
@@ -29,7 +29,7 @@ const mockCompareFaresResponse = {
       },
     },
     {
-      provider: { id: 1, name: "ridego", displayName: "RideGo" },
+      provider: { id: 1, name: "ridego", displayName: "inDrive" },
       fare: 201,
       etaMin: 4,
       isCheapest: false,
@@ -46,7 +46,7 @@ const mockCompareFaresResponse = {
       },
     },
     {
-      provider: { id: 3, name: "urbancab", displayName: "UrbanCab" },
+      provider: { id: 3, name: "urbancab", displayName: "Bykea" },
       fare: 237,
       etaMin: 3,
       isCheapest: false,
