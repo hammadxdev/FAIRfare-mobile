@@ -1,0 +1,50 @@
+# Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
+
+# dependencies
+node_modules/
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.log
+coverage/
+
+# macOS
+.DS_Store
+*.pem
+
+# local env files
+.env
+.env.*
+.env*.local
+!.env.example
+
+# typescript
+*.tsbuildinfo
+
+# Generated native projects — intentionally fully ignored. This app uses
+# Expo's managed workflow + EAS Build, which regenerates android/ (and ios/)
+# from app.config.js on every build. If this ever switches to a committed
+# "bare" workflow, replace these two lines with the narrower
+# android/.gradle/, android/app/build/, android/build/ patterns instead.
+/ios
+/android
