@@ -7,6 +7,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  Modal,
+  TextInput,
   StyleSheet,
 } from "react-native";
 import AppHeader from "../components/AppHeader";
@@ -19,12 +21,13 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorState from "../components/ErrorState";
 import mockLocations, { ENABLE_MOCK_LOCATION_FALLBACK } from "../constants/mockLocations";
 import mockCompareFaresResponse, { ENABLE_MOCK_FALLBACK } from "../constants/mockProviders";
-import { compareFares } from "../services/api";
+import { compareFares, createSavedRoute, getProviderStatus, getSavedRoutes } from "../services/api";
 import { autocompletePlaces, getPlaceDetails, reverseGeocode, computeRoute } from "../services/maps.service";
 import { getCurrentLocation } from "../services/location.service";
 import { canCompareFares, isSameLocation } from "../utils/validators";
 import { debounce } from "../utils/debounce";
 import { createSessionToken } from "../utils/sessionToken";
+import { getLocationDisplayText } from "../utils/locationDisplay";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 
 const MIN_AUTOCOMPLETE_LENGTH = 3;
@@ -58,13 +61,25 @@ function toSuggestion(prediction) {
   };
 }
 
-// LocationInput always displays the fuller, more useful string: the
-// readable address when we have one, falling back to the short name.
+// LocationInput always displays one canonical human-readable location label.
 function displayNameFor(location) {
-  return location.address || location.name;
+  return getLocationDisplayText(location);
 }
 
-export default function HomeScreen({ navigation }) {
+function toCanonicalLocation(location) {
+  if (!location) return null;
+  return {
+    name: location.name,
+    address: location.address,
+    lat: location.lat ?? location.latitude,
+    lng: location.lng ?? location.longitude,
+  };
+}
+
+export default function HomeScreen({ navigation, route }) {
+  useEffect(() => {
+    getProviderStatus().catch((err) => console.warn("[providers] status unavailable", err?.message || err));
+  }, []);
   const [pickupQuery, setPickupQuery] = useState("");
   const [pickup, setPickup] = useState(null);
   const [pickupSuggestions, setPickupSuggestions] = useState([]);
@@ -82,12 +97,59 @@ export default function HomeScreen({ navigation }) {
   const [vehicleType, setVehicleType] = useState(null);
   const [loading, setLoading] = useState(false);
   const [locating, setLocating] = useState(false);
+  const locatingRef = useRef(false);
+  const deviceLocationRef = useRef(null);
+  const pickupRef = useRef(null);
+  const dropoffRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
   const [selectingMode, setSelectingMode] = useState("pickup");
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [routeInfo, setRouteInfo] = useState(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
+  const [savedRoutes, setSavedRoutes] = useState([]);
+  const [saveModalVisible, setSaveModalVisible] = useState(false);
+  const [saveName, setSaveName] = useState("");
+  const [saveLabelType, setSaveLabelType] = useState("FAVORITE");
+  const [saveLoading, setSaveLoading] = useState(false);
+
+  const labelOptions = [
+    ["HOME", "Home"], ["WORK", "Work"], ["UNIVERSITY", "University"], ["FAVORITE", "Favorite"], ["CUSTOM", "Custom"],
+  ];
+
+  const loadSavedRoutes = useCallback(async () => {
+    try { setSavedRoutes((await getSavedRoutes()).data || []); } catch (error) { console.warn("[saved-routes] unavailable", error?.message || error); }
+  }, []);
+
+  useEffect(() => { loadSavedRoutes(); }, [loadSavedRoutes]);
+
+  useEffect(() => {
+    const compareAgain = route?.params?.compareAgain;
+    if (!compareAgain) return;
+    const nextPickup = {
+      name: compareAgain.pickup.label,
+      address: compareAgain.pickup.label,
+      lat: compareAgain.pickup.latitude,
+      lng: compareAgain.pickup.longitude,
+    };
+    const nextDropoff = {
+      name: compareAgain.dropoff.label,
+      address: compareAgain.dropoff.label,
+      lat: compareAgain.dropoff.latitude,
+      lng: compareAgain.dropoff.longitude,
+    };
+    applyPickup(nextPickup);
+    applyDropoff(nextDropoff);
+    navigation.setParams({ compareAgain: undefined });
+  }, [route?.params?.compareAgain]);
+
+  useEffect(() => {
+    const saved = route?.params?.savedRoute;
+    if (!saved) return;
+    applyPickup(toCanonicalLocation(saved.pickup));
+    applyDropoff(toCanonicalLocation(saved.destination));
+    navigation.setParams({ savedRoute: undefined });
+  }, [route?.params?.savedRoute]);
 
   // One Google Places session token per search session (per field); reset to
   // null after a place is selected so the next search starts a fresh one.
@@ -142,12 +204,14 @@ export default function HomeScreen({ navigation }) {
   // handleDropoffChange) the instant the query crosses the minimum length,
   // not in here — waiting for the debounce to fire before showing any
   // feedback is exactly what produced the open/close flicker.
-  function createSearchRunner({ sessionTokenRef, setSuggestions, setLoading, setStatus, setStatusType, requestIdRef }) {
+  function createSearchRunner({ field, sessionTokenRef, setSuggestions, setLoading, setStatus, setStatusType, requestIdRef }) {
     return debounce(async (query) => {
       const requestId = ++requestIdRef.current;
       try {
         const token = nextSessionToken(sessionTokenRef);
-        const res = await autocompletePlaces(query.trim(), token);
+        const selectedLocation = field === "pickup" ? dropoffRef.current : pickupRef.current;
+        const coordinates = deviceLocationRef.current || selectedLocation;
+        const res = await autocompletePlaces(query.trim(), token, coordinates);
         if (requestIdRef.current !== requestId) return; // superseded by a newer request
         const results = (res.data || []).map(toSuggestion);
         setSuggestions(results);
@@ -178,6 +242,7 @@ export default function HomeScreen({ navigation }) {
   const runPickupSearch = useMemo(
     () =>
       createSearchRunner({
+        field: "pickup",
         sessionTokenRef: pickupSessionTokenRef,
         setSuggestions: setPickupSuggestions,
         setLoading: setPickupLoading,
@@ -191,6 +256,7 @@ export default function HomeScreen({ navigation }) {
   const runDropoffSearch = useMemo(
     () =>
       createSearchRunner({
+        field: "dropoff",
         sessionTokenRef: dropoffSessionTokenRef,
         setSuggestions: setDropoffSuggestions,
         setLoading: setDropoffLoading,
@@ -242,6 +308,7 @@ export default function HomeScreen({ navigation }) {
     runPickupSearch.cancel();
     pickupRequestIdRef.current += 1; // a still-in-flight response must not overwrite this selection
     setPickup(location);
+    pickupRef.current = location;
     setPickupQuery(displayNameFor(location));
     setPickupSuggestions([]);
     setPickupLoading(false);
@@ -254,6 +321,7 @@ export default function HomeScreen({ navigation }) {
     runDropoffSearch.cancel();
     dropoffRequestIdRef.current += 1; // a still-in-flight response must not overwrite this selection
     setDropoff(location);
+    dropoffRef.current = location;
     setDropoffQuery(displayNameFor(location));
     setDropoffSuggestions([]);
     setDropoffLoading(false);
@@ -322,16 +390,20 @@ export default function HomeScreen({ navigation }) {
   };
 
   const handleUseCurrentLocation = useCallback(async () => {
+    if (locatingRef.current) return;
+    locatingRef.current = true;
     setLocating(true);
     setErrorMessage(null);
     try {
       const location = await getCurrentLocation();
+      deviceLocationRef.current = { lat: location.lat, lng: location.lng };
       try {
         const res = await reverseGeocode(location.lat, location.lng);
+        if (!getLocationDisplayText(res.data)) throw new Error("The server returned no readable address.");
         applyPickup({
-          id: "current-location",
-          name: res.data.name || "Current Location",
-          address: res.data.address || "Selected current location",
+          name: res.data.name,
+          address: res.data.address,
+          formattedAddress: res.data.formattedAddress || res.data.formatted_address,
           lat: location.lat,
           lng: location.lng,
         });
@@ -339,17 +411,14 @@ export default function HomeScreen({ navigation }) {
         // Don't block the user on a failed reverse geocode — fall back to a
         // clearly-labeled placeholder instead of a silent bare "Current Location".
         console.error("[maps] reverse-geocode failed for current location:", err?.response?.data?.message || err?.message || err);
-        applyPickup({
-          id: "current-location",
-          name: "Current Location",
-          address: "Current Location - address unavailable",
-          lat: location.lat,
-          lng: location.lng,
-        });
+        setErrorMessage("Unable to resolve your current location. Please try again.");
       }
     } catch (err) {
-      Alert.alert("Location Unavailable", err.message || "Could not access your current location.");
+      const message = err.message || "Could not access your current location.";
+      setErrorMessage(message);
+      Alert.alert("Location Unavailable", message);
     } finally {
+      locatingRef.current = false;
       setLocating(false);
     }
   }, []);
@@ -462,6 +531,22 @@ export default function HomeScreen({ navigation }) {
     }
   };
 
+  const openSaveModal = () => {
+    setSaveName(`${pickup.name} to ${dropoff.name}`.slice(0, 100));
+    setSaveLabelType("FAVORITE");
+    setSaveModalVisible(true);
+  };
+
+  const handleSaveRoute = async () => {
+    if (!pickup?.lat || !pickup?.lng || !dropoff?.lat || !dropoff?.lng || !saveName.trim()) return;
+    setSaveLoading(true);
+    try {
+      await createSavedRoute({ name: saveName.trim(), labelType: saveLabelType, pickup: { name: pickup.name, address: pickup.address, latitude: pickup.lat, longitude: pickup.lng }, destination: { name: dropoff.name, address: dropoff.address, latitude: dropoff.lat, longitude: dropoff.lng } });
+      setSaveModalVisible(false); await loadSavedRoutes(); setErrorMessage("Route saved. You can compare this trip again from Saved Trips.");
+    } catch (error) { if (error?.code !== "SESSION_EXPIRED") setErrorMessage(error?.response?.data?.message || "Unable to save route. Please try again."); }
+    finally { setSaveLoading(false); }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -546,6 +631,18 @@ export default function HomeScreen({ navigation }) {
             loading={loading}
             style={styles.compareButton}
           />
+          {pickup && dropoff && pickup.lat != null && pickup.lng != null && dropoff.lat != null && dropoff.lng != null && !sameLocationError ? (
+            <TouchableOpacity style={styles.saveRouteButton} onPress={openSaveModal}>
+              <Text style={styles.saveRouteText}>☆ Save Route</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        <View style={styles.savedSection}>
+          <View style={styles.savedHeader}><Text style={styles.savedTitle}>Saved Trips</Text>{savedRoutes.length > 0 && <TouchableOpacity onPress={() => navigation.getParent()?.navigate("SavedRoutes")}><Text style={styles.viewAll}>See all</Text></TouchableOpacity>}</View>
+          {savedRoutes.slice(0, 3).map((item) => <TouchableOpacity key={item.id} style={styles.savedRow} onPress={() => { applyPickup(toCanonicalLocation(item.pickup)); applyDropoff(toCanonicalLocation(item.destination)); }}><Text style={styles.savedRouteName}>{item.name}</Text><Text style={styles.savedRoutePath}>{getLocationDisplayText(item.pickup)} → {getLocationDisplayText(item.destination)}</Text></TouchableOpacity>)}
+          {!savedRoutes.length ? <Text style={styles.savedHint}>Save routes you travel often for quicker fare comparisons.</Text> : null}
+          <TouchableOpacity style={styles.savedLink} onPress={() => navigation.getParent()?.navigate("SavedRoutes")}><Text style={styles.savedLinkText}>{savedRoutes.length ? "Manage Saved Trips" : "View Saved Trips"}</Text></TouchableOpacity>
         </View>
       </ScrollView>
 
@@ -561,6 +658,9 @@ export default function HomeScreen({ navigation }) {
       />
 
       <LoadingOverlay visible={loading} />
+      <Modal transparent animationType="slide" visible={saveModalVisible} onRequestClose={() => setSaveModalVisible(false)}>
+        <View style={styles.modalBackdrop}><View style={styles.modalCard}><Text style={styles.modalTitle}>Save Route</Text><Text style={styles.modalLabel}>Name</Text><TextInput value={saveName} onChangeText={setSaveName} maxLength={100} style={styles.modalInput} placeholder="Home to University" /><Text style={styles.modalLabel}>Label</Text><View style={styles.labelRow}>{labelOptions.map(([value, label]) => <TouchableOpacity key={value} onPress={() => setSaveLabelType(value)} style={[styles.labelChip, saveLabelType === value && styles.labelChipActive]}><Text style={[styles.labelChipText, saveLabelType === value && styles.labelChipTextActive]}>{label}</Text></TouchableOpacity>)}</View><PrimaryButton title="Save" onPress={handleSaveRoute} loading={saveLoading} disabled={!saveName.trim()} /><TouchableOpacity onPress={() => setSaveModalVisible(false)} style={styles.modalCancel}><Text style={styles.modalCancelText}>Cancel</Text></TouchableOpacity></View></View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -631,4 +731,28 @@ const styles = StyleSheet.create({
   compareButton: {
     marginTop: spacing.lg,
   },
+  saveRouteButton: { alignItems: "center", paddingVertical: spacing.md },
+  saveRouteText: { color: colors.navy, fontWeight: "800" },
+  savedSection: { marginHorizontal: spacing.lg, marginTop: spacing.lg, marginBottom: spacing.xl },
+  savedHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: spacing.sm },
+  savedTitle: { color: colors.primary, fontSize: 17, fontWeight: "800" },
+  viewAll: { color: colors.navy, fontWeight: "800", fontSize: 12 },
+  savedRow: { backgroundColor: colors.card, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.border },
+  savedRouteName: { color: colors.primary, fontWeight: "800" },
+  savedRoutePath: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  savedHint: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: spacing.sm },
+  savedLink: { alignItems: "center", paddingVertical: spacing.md },
+  savedLinkText: { color: colors.navy, fontWeight: "800" },
+  modalBackdrop: { flex: 1, backgroundColor: "rgba(15,23,42,.45)", justifyContent: "flex-end" },
+  modalCard: { backgroundColor: colors.card, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg },
+  modalTitle: { color: colors.primary, fontSize: 20, fontWeight: "800", marginBottom: spacing.lg },
+  modalLabel: { color: colors.muted, fontSize: 12, fontWeight: "700", marginBottom: spacing.sm },
+  modalInput: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 12, color: colors.primary, marginBottom: spacing.lg },
+  labelRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: spacing.lg },
+  labelChip: { borderWidth: 1, borderColor: colors.border, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+  labelChipActive: { backgroundColor: colors.navy, borderColor: colors.navy },
+  labelChipText: { color: colors.muted, fontWeight: "700", fontSize: 12 },
+  labelChipTextActive: { color: colors.white },
+  modalCancel: { alignItems: "center", padding: spacing.md },
+  modalCancelText: { color: colors.muted, fontWeight: "700" },
 });

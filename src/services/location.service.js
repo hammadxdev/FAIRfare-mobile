@@ -7,12 +7,20 @@ export async function getCurrentLocation() {
     throw new Error("Location permission was denied. Please enable location access to use this feature.");
   }
 
-  const position = await Location.getCurrentPositionAsync({});
+  const positionPromise = Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.High,
+    mayShowUserSettingsDialog: true,
+  });
+  const timeoutPromise = new Promise((_, reject) => {
+    setTimeout(() => reject(new Error("Location request timed out. Please try again.")), 15000);
+  });
+  const position = await Promise.race([positionPromise, timeoutPromise]);
+
+  if (!Number.isFinite(position?.coords?.latitude) || !Number.isFinite(position?.coords?.longitude)) {
+    throw new Error("Your device did not return a usable location. Please try again.");
+  }
 
   return {
-    id: "current-location",
-    name: "Current Location",
-    address: "Your current location",
     lat: position.coords.latitude,
     lng: position.coords.longitude,
   };

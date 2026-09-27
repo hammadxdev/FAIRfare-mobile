@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "rea
 import MapView, { Marker, Polyline } from "react-native-maps";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import { getRegionForPoints } from "../utils/mapRegion";
+import { getLocationDisplayText } from "../utils/locationDisplay";
 
 const SELECTING_MODES = ["pickup", "dropoff"];
 
@@ -63,7 +64,7 @@ export default function MapPreview({
             coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
             pinColor={colors.accent}
             title="Pickup"
-            description={pickup.name}
+            description={getLocationDisplayText(pickup)}
           />
         )}
         {dropoff && (
@@ -71,7 +72,7 @@ export default function MapPreview({
             coordinate={{ latitude: dropoff.lat, longitude: dropoff.lng }}
             pinColor={colors.navy}
             title="Drop-off"
-            description={dropoff.name}
+            description={getLocationDisplayText(dropoff)}
           />
         )}
         {routeCoordinates.length > 1 ? (

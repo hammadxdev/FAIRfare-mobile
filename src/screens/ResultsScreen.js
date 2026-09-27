@@ -1,8 +1,9 @@
 import React from "react";
-import { View, Text, ScrollView, Alert, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from "react-native";
 import ProviderFareCard from "../components/ProviderFareCard";
 import EmptyState from "../components/EmptyState";
 import colors, { radius, shadow, spacing } from "../constants/colors";
+import { openProvider } from "../services/providerLauncher";
 
 function capitalize(value) {
   if (!value) return "";
@@ -26,16 +27,8 @@ export default function ResultsScreen({ route, navigation }) {
 
   const { pickup, dropoff, vehicleType, distanceKm, durationMin, results = [] } = result;
 
-  const handleOpenApp = (providerResult) => {
-    Alert.alert("Opening provider app...", `${providerResult.provider.displayName} deep link coming soon.`);
-  };
-
-  const handleViewBreakdown = (providerResult) => {
-    navigation.navigate("FareBreakdown", {
-      result: providerResult,
-      context: { pickup, dropoff, vehicleType, distanceKm, durationMin },
-    });
-  };
+  const handleOpenApp = (providerResult) => openProvider(providerResult.provider.name, { pickup, destination: dropoff });
+  const handleAskAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.content}>
@@ -70,14 +63,23 @@ export default function ResultsScreen({ route, navigation }) {
         </View>
       </View>
 
+      <TouchableOpacity style={styles.askAiButton} onPress={handleAskAi} disabled={!result.comparisonId}>
+        <Text style={styles.askAiText}>{result.comparisonId ? "Ask AI about these rides" : "AI context unavailable"}</Text>
+      </TouchableOpacity>
+
       <Text style={styles.sectionTitle}>{results.length} providers compared</Text>
+
+      {results.length > 0 && !results.some((item) => item.personalization?.isTopRecommendation) && (
+        <Text style={styles.noPersonalizedMatch}>No available ride matches your current vehicle preferences.</Text>
+      )}
+
+      {results.length === 0 && <Text style={styles.noPersonalizedMatch}>No provider quotes are currently available. Please try again later.</Text>}
 
       {results.map((item) => (
         <ProviderFareCard
           key={item.provider.id}
           result={item}
           onOpenApp={handleOpenApp}
-          onViewBreakdown={handleViewBreakdown}
         />
       ))}
 
@@ -173,4 +175,12 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingHorizontal: spacing.md,
   },
+  noPersonalizedMatch: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: spacing.md,
+  },
+  askAiButton: { backgroundColor: colors.navy, borderRadius: radius.md, paddingVertical: 13, alignItems: "center", marginBottom: spacing.lg },
+  askAiText: { color: colors.white, fontWeight: "800", fontSize: 13 },
 });

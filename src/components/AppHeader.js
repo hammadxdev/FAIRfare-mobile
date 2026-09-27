@@ -1,15 +1,17 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import LogoMark from "./LogoMark";
 import colors, { spacing } from "../constants/colors";
 
 export default function AppHeader({
-  title = "FAIRfair",
+  title = "FairFare",
   subtitle = "Compare fares. Choose fair.",
   showLogo = true,
 }) {
+  const insets = useSafeAreaInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
       {showLogo && <LogoMark size={42} style={styles.logo} />}
       <View>
         <Text style={styles.title}>{title}</Text>

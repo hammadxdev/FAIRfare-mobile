@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
 import colors, { radius, spacing } from "../constants/colors";
+import { getLocationDisplayText } from "../utils/locationDisplay";
 
 // react-native-maps has no web renderer, so this must never import it — this
 // stylized preview card stands in for the real map on `expo start --web`.
@@ -37,7 +38,7 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
         <View style={[styles.markerWrap, styles.pickupPosition]}>
           <View style={[styles.dot, styles.pickupDot]} />
           <Text style={styles.markerLabel} numberOfLines={1}>
-            {pickup.name}
+            {getLocationDisplayText(pickup)}
           </Text>
         </View>
       )}
@@ -46,7 +47,7 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
         <View style={[styles.markerWrap, styles.dropoffPosition]}>
           <View style={[styles.dot, styles.dropoffDot]} />
           <Text style={styles.markerLabel} numberOfLines={1}>
-            {dropoff.name}
+            {getLocationDisplayText(dropoff)}
           </Text>
         </View>
       )}
@@ -56,10 +57,10 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
           <Text style={styles.overlayTitle}>Route preview</Text>
           <Text style={styles.overlaySubtitle} numberOfLines={1}>
             {hasRoute
-              ? `${pickup.name} → ${dropoff.name}`
+              ? `${getLocationDisplayText(pickup)} → ${getLocationDisplayText(dropoff)}`
               : hasPickup
-              ? `Pickup: ${pickup.name}`
-              : `Drop-off: ${dropoff.name}`}
+              ? `Pickup: ${getLocationDisplayText(pickup)}`
+              : `Drop-off: ${getLocationDisplayText(dropoff)}`}
           </Text>
           {isRouteLoading && <Text style={styles.overlaySubtitle}>Calculating route...</Text>}
           {!isRouteLoading && routeInfo && (

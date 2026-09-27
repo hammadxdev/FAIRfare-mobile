@@ -4,12 +4,18 @@
   },
   "build": {
     "preview": {
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://fai-rfare.vercel.app/api"
+      },
       "android": {
         "buildType": "apk"
       },
       "distribution": "internal"
     },
     "production": {
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://fai-rfare.vercel.app/api"
+      },
       "android": {
         "buildType": "app-bundle"
       }

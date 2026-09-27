@@ -55,7 +55,7 @@ export default function RootNavigator() {
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: true, title: "Privacy Policy", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="HelpSupport" component={HelpScreen} options={{ headerShown: true, title: "Help & Support", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       </Stack.Navigator>
-      <Modal transparent visible={Boolean(sessionNotice)} animationType="fade"><View style={styles.backdrop}><View style={styles.dialog}><Text style={styles.title}>Session expired</Text><Text style={styles.message}>{sessionNotice}</Text><TouchableOpacity style={styles.button} onPress={dismissSessionNotice}><Text style={styles.buttonText}>Sign in</Text></TouchableOpacity></View></View></Modal>
+      <Modal transparent visible={Boolean(sessionNotice)} animationType="fade"><View style={styles.backdrop}><View style={styles.dialog}><Text style={styles.title}>{sessionNotice?.title || "Session issue"}</Text><Text style={styles.message}>{sessionNotice?.message || sessionNotice}</Text><TouchableOpacity style={styles.button} onPress={dismissSessionNotice}><Text style={styles.buttonText}>{sessionNotice?.action || "Continue"}</Text></TouchableOpacity></View></View></Modal>
   </>);
 }
 

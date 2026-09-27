@@ -9,6 +9,18 @@ const colors = {
   warning: "#F59E0B",
   white: "#FFFFFF",
   navy: "#1E3A8A",
+  forest: "#0F766E",
+  softGreen: "#ECFDF5",
+  paleGreen: "#D1FAE5",
+  primaryDark: "#0F766E",
+  primarySoft: "#ECFDF5",
+  surface: "#FFFFFF",
+  surfaceMuted: "#F8FAFC",
+  textPrimary: "#111827",
+  textSecondary: "#64748B",
+  success: "#16A34A",
+  dangerSoft: "#FEE2E2",
+  dangerSurface: "#FFF7F7",
 };
 
 export const radius = {

@@ -10,26 +10,37 @@ if (!process.env.GOOGLE_MAPS_ANDROID_API_KEY) {
   );
 }
 
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+const usesLocalHttpApi = apiBaseUrl?.startsWith("http://") === true;
+
 export default {
   expo: {
-    name: "FAIRfair",
+    name: "Fair Fare",
     slug: "fairfair",
     version: "1.0.0",
     orientation: "portrait",
-    icon: "./assets/icon.png",
+    // Use the official Fair Fare mark instead of the Expo starter artwork.
+    icon: "./assets/logo/logo.png",
     userInterfaceStyle: "light",
+    splash: {
+      image: "./assets/logo/logo.png",
+      resizeMode: "contain",
+      backgroundColor: "#0F766E",
+    },
 
     ios: {
       supportsTablet: true,
     },
 
     android: {
-      package: "com.fairfair.app",
+      package: "com.fairfare.app",
+      // Allow cleartext only for an explicitly configured local HTTP backend.
+      // HTTPS/Vercel builds leave Android's cleartext protection enabled.
+      usesCleartextTraffic: usesLocalHttpApi,
       adaptiveIcon: {
-        backgroundColor: "#E6F4FE",
-        foregroundImage: "./assets/android-icon-foreground.png",
-        backgroundImage: "./assets/android-icon-background.png",
-        monochromeImage: "./assets/android-icon-monochrome.png",
+        backgroundColor: "#F3F8EC",
+        foregroundImage: "./assets/logo/logo.png",
+        monochromeImage: "./assets/logo/logo.png",
       },
     },
 
@@ -38,6 +49,15 @@ export default {
     },
 
     plugins: [
+      [
+        "expo-splash-screen",
+        {
+          image: "./assets/logo/logo.png",
+          imageWidth: 220,
+          resizeMode: "contain",
+          backgroundColor: "#0F766E",
+        },
+      ],
       [
         "react-native-maps",
         {

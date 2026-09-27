@@ -4,8 +4,13 @@ import apiClient from "./api";
 // Google API key never ships in the app bundle. Never call Google endpoints
 // directly from the frontend.
 
-export async function autocompletePlaces(input, sessionToken) {
-  const response = await apiClient.get("/maps/autocomplete", { params: { input, sessionToken } });
+export async function autocompletePlaces(input, sessionToken, coordinates) {
+  const params = { input, sessionToken };
+  if (Number.isFinite(coordinates?.lat) && Number.isFinite(coordinates?.lng)) {
+    params.lat = coordinates.lat;
+    params.lng = coordinates.lng;
+  }
+  const response = await apiClient.get("/maps/autocomplete", { params });
   return response.data;
 }
 

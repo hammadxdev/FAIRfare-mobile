@@ -31,6 +31,15 @@ let sessionExpiryNotified = false;
 export function configureAuth(handlers) { authHandlers = handlers; }
 export function setAuthSigningOut(value) { authSigningOut = Boolean(value); }
 export function resetSessionExpiryNotification() { sessionExpiryNotified = false; }
+function isRefreshAuthFailure(error) { return error?.response?.status === 401; }
+function refreshOnce() {
+  if (!refreshPromise) {
+    refreshPromise = Promise.resolve()
+      .then(() => authHandlers.refresh())
+      .finally(() => { refreshPromise = null; });
+  }
+  return refreshPromise;
+}
 apiClient.interceptors.request.use(async (config) => {
   if (!config.skipAuth) { const session = await authHandlers.getSession?.(); if (session?.accessToken) config.headers.Authorization = `Bearer ${session.accessToken}`; }
   return config;
@@ -39,12 +48,14 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
   const config = error.config;
   if (error.response?.status !== 401 || config?._authRetried || config?.skipAuth || authSigningOut || !authHandlers.refresh || config?.url?.includes("/auth/refresh")) throw error;
   config._authRetried = true;
-  try { refreshPromise ||= authHandlers.refresh(); const session = await refreshPromise; config.headers.Authorization = `Bearer ${session.accessToken}`; return apiClient(config); }
+  try { const session = await refreshOnce(); config.headers.Authorization = `Bearer ${session.accessToken}`; return apiClient(config); }
   catch (refreshError) {
-    if (!sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
-    const sessionError = new Error("Your session has expired. Please sign in again.");
-    sessionError.code = "SESSION_EXPIRED";
+    const isSessionExpired = isRefreshAuthFailure(refreshError);
+    if (isSessionExpired && !sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
+    const sessionError = new Error(isSessionExpired ? "Your session has expired. Please sign in again." : "We could not refresh your session. Check your connection and try again.");
+    sessionError.code = isSessionExpired ? "SESSION_EXPIRED" : "SESSION_REFRESH_UNAVAILABLE";
     sessionError.sessionError = true;
+    sessionError.retryable = !isSessionExpired;
     sessionError.cause = refreshError;
     throw sessionError;
   }
