@@ -68,11 +68,13 @@ function displayNameFor(location) {
 
 function toCanonicalLocation(location) {
   if (!location) return null;
+  const latitude = location.lat ?? location.latitude;
+  const longitude = location.lng ?? location.longitude;
   return {
     name: location.name,
     address: location.address,
-    lat: location.lat ?? location.latitude,
-    lng: location.lng ?? location.longitude,
+    lat: typeof latitude === "string" && latitude.trim() !== "" ? Number(latitude) : latitude,
+    lng: typeof longitude === "string" && longitude.trim() !== "" ? Number(longitude) : longitude,
   };
 }
 

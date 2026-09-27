@@ -1,4 +1,5 @@
 import axios from "axios";
+import { createRefreshSingleFlight, isRefreshAuthFailure } from "./authRetry.cjs";
 
 // This is the only mobile API base URL. Expo inlines EXPO_PUBLIC_* variables
 // at bundle time; restart Expo after changing the value.
@@ -25,21 +26,12 @@ const apiClient = axios.create({
 });
 
 let authHandlers = { getSession: null, refresh: null, signOut: null };
-let refreshPromise = null;
 let authSigningOut = false;
 let sessionExpiryNotified = false;
 export function configureAuth(handlers) { authHandlers = handlers; }
 export function setAuthSigningOut(value) { authSigningOut = Boolean(value); }
 export function resetSessionExpiryNotification() { sessionExpiryNotified = false; }
-function isRefreshAuthFailure(error) { return error?.response?.status === 401; }
-function refreshOnce() {
-  if (!refreshPromise) {
-    refreshPromise = Promise.resolve()
-      .then(() => authHandlers.refresh())
-      .finally(() => { refreshPromise = null; });
-  }
-  return refreshPromise;
-}
+const refreshOnce = createRefreshSingleFlight(() => authHandlers.refresh());
 apiClient.interceptors.request.use(async (config) => {
   if (!config.skipAuth) { const session = await authHandlers.getSession?.(); if (session?.accessToken) config.headers.Authorization = `Bearer ${session.accessToken}`; }
   return config;
@@ -52,14 +44,13 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
   catch (refreshError) {
     const isSessionExpired = isRefreshAuthFailure(refreshError);
     if (isSessionExpired && !sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
-    const sessionError = new Error(isSessionExpired ? "Your session has expired. Please sign in again." : "We could not refresh your session. Check your connection and try again.");
+    const sessionError = new Error(isSessionExpired ? "Your session has expired. Please sign in again." : "We could not refresh your session because the server is temporarily unavailable. Please try again.");
     sessionError.code = isSessionExpired ? "SESSION_EXPIRED" : "SESSION_REFRESH_UNAVAILABLE";
     sessionError.sessionError = true;
     sessionError.retryable = !isSessionExpired;
     sessionError.cause = refreshError;
     throw sessionError;
   }
-  finally { refreshPromise = null; }
 });
 
 function authData(response) { return response.data.data; }

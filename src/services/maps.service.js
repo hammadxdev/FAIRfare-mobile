@@ -1,4 +1,5 @@
 import apiClient from "./api";
+import { toRouteLocation } from "../utils/locationPayload.cjs";
 
 // All Google Maps access goes through our backend proxy (/api/maps/*) so the
 // Google API key never ships in the app bundle. Never call Google endpoints
@@ -25,7 +26,11 @@ export async function reverseGeocode(lat, lng) {
 }
 
 export async function computeRoute(origin, destination, vehicleType) {
-  const response = await apiClient.post("/maps/route", { origin, destination, vehicleType });
+  const response = await apiClient.post("/maps/route", {
+    origin: toRouteLocation(origin),
+    destination: toRouteLocation(destination),
+    vehicleType,
+  });
   return response.data;
 }
 
