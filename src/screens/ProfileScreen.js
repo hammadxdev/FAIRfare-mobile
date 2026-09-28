@@ -19,7 +19,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
   useEffect(() => { setName(user?.name || ""); }, [user?.name]);
-  const avatar = useMemo(() => initials(user?.name || name), [name, user?.name]);
+  const avatar = useMemo(() => initials(name || user?.name), [name, user?.name]);
   const validate = () => {
     const value = name.normalize("NFKC").trim();
     if (!value) return "Enter your name.";
@@ -41,11 +41,11 @@ export default function ProfileScreen() {
   if (isLoading) return <ScrollView style={styles.flex} contentContainerStyle={styles.content}><View style={styles.header}><SkeletonBlock width={88} height={88} borderRadius={radius.full} /><SkeletonBlock width="42%" height={24} style={{ marginTop: spacing.md }} /><SkeletonBlock width="78%" height={14} style={{ marginTop: spacing.sm }} /></View><SkeletonCard><SkeletonBlock width="28%" height={13} /><SkeletonBlock width="100%" height={52} borderRadius={radius.md} style={{ marginTop: spacing.sm }} /></SkeletonCard><SkeletonCard><SkeletonBlock width="22%" height={13} /><SkeletonBlock width="58%" height={17} style={{ marginTop: spacing.md }} /><SkeletonBlock width="44%" height={13} style={{ marginTop: spacing.sm }} /></SkeletonCard></ScrollView>;
   return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={styles.header}><View style={styles.avatar}><Text style={styles.avatarText}>{avatar}</Text></View><Text style={styles.title}>{user?.name || "Your profile"}</Text><Text style={styles.subtitle}>Keep your Fair Fare account information up to date.</Text></View>
+      <View style={styles.header}><View style={styles.avatar}><Text style={styles.avatarText}>{avatar}</Text></View><Text style={styles.title}>{name.trim() || "Your profile"}</Text><Text style={styles.subtitle}>Update your display name while keeping your verified email secure.</Text></View>
       <Text style={styles.section}>PERSONAL INFORMATION</Text>
       <View style={styles.card}><Text style={styles.label}>Full name</Text><TextInput value={name} onChangeText={(value) => { setName(value); setFeedback(null); }} style={styles.input} placeholder="Your name" placeholderTextColor={colors.muted} autoCapitalize="words" maxLength={120} returnKeyType="done" onSubmitEditing={save} accessibilityLabel="Full name" /></View>
       <Text style={styles.section}>ACCOUNT INFORMATION</Text>
-      <View style={styles.card}><Text style={styles.label}>Email</Text><Text style={styles.email}>{user?.email || "Not available"}</Text><View style={styles.verified}><Text style={styles.check}>✓</Text><Text style={styles.verifiedText}>{user?.emailVerifiedAt ? "Verified email" : "Email verification pending"}</Text></View><Text style={styles.helper}>Your email is used for account security.</Text></View>
+      <View style={styles.card}><Text style={styles.label}>Email</Text><Text style={styles.email}>{user?.email || "Not available"}</Text><View style={styles.verified}><Text style={styles.check}>✓</Text><Text style={styles.verifiedText}>{user?.emailVerifiedAt ? "Verified email" : "Email verification pending"}</Text></View><Text style={styles.helper}>Your verified email is used for account security.</Text></View>
       {feedback ? <Text style={feedback.type === "error" ? styles.error : styles.success}>{feedback.text}</Text> : null}
       <TouchableOpacity style={[styles.save, saving && styles.disabled]} onPress={save} disabled={saving} activeOpacity={0.8} accessibilityRole="button" accessibilityLabel="Save changes">{saving ? <ActivityIndicator color={colors.white} accessibilityLabel="Saving profile"/> : <Text style={styles.saveText}>Save changes</Text>}</TouchableOpacity>
     </ScrollView>
