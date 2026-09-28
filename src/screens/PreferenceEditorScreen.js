@@ -3,6 +3,8 @@ import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleShe
 import colors, { radius, spacing } from "../constants/colors";
 import { getPreferences, updatePreferences } from "../services/api";
 import PreferenceOptionRow from "../components/settings/PreferenceOptionRow";
+import SkeletonCard from "../components/skeleton/SkeletonCard";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 
 const VEHICLES = [["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"], ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"]];
 const PRIORITIES = [["CHEAPEST", "CHEAPEST FARE", "Save money", "Prioritize lower fares"], ["FASTEST_PICKUP", "FASTEST PICKUP", "Save time", "Prioritize shorter pickup ETA"], ["BALANCED", "BALANCED", "Best balance", "Consider fare, pickup time and preferences"]];
@@ -21,7 +23,7 @@ export default function PreferenceEditorScreen({ route, navigation }) {
   };
   const toggleAvoid = (value) => setPrefs((current) => ({ ...current, avoidedVehicleTypes: current.avoidedVehicleTypes.includes(value) ? current.avoidedVehicleTypes.filter((item) => item !== value) : [...current.avoidedVehicleTypes, value] }));
   const [title, subtitle] = labels[mode];
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text>{loading ? <ActivityIndicator color={colors.accent} style={styles.loader}/> : <>
+  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text>{loading ? <SkeletonCard><SkeletonBlock width="72%" height={17} /><SkeletonBlock width="52%" height={14} style={{ marginTop: spacing.md }} /><SkeletonBlock width="88%" height={48} borderRadius={radius.md} style={{ marginTop: spacing.lg }} /><SkeletonBlock width="60%" height={14} style={{ marginTop: spacing.md }} /></SkeletonCard> : <>
     {mode === "preferred" && <View style={styles.card}>{[[null, "No preference"], ...VEHICLES].map(([value, label]) => <PreferenceOptionRow key={label} label={label} selected={prefs.preferredVehicleType === value} onPress={() => setPrefs((current) => ({ ...current, preferredVehicleType: value }))}/>)}</View>}
     {mode === "avoided" && <View style={styles.card}>{VEHICLES.map(([value, label]) => <TouchableOpacity key={value} style={[styles.option, prefs.avoidedVehicleTypes.includes(value) && styles.selected]} onPress={() => toggleAvoid(value)}><View style={[styles.checkbox, prefs.avoidedVehicleTypes.includes(value) && styles.checkboxSelected]}>{prefs.avoidedVehicleTypes.includes(value) ? <Text style={styles.check}>✓</Text> : null}</View><Text style={styles.optionText}>{label}</Text></TouchableOpacity>)}</View>}
     {mode === "budget" && <><Text style={styles.optional}>Optional</Text><View style={styles.inputWrap}><Text style={styles.currency}>PKR</Text><TextInput value={prefs.typicalBudget} onChangeText={(value) => setPrefs((current) => ({ ...current, typicalBudget: value.replace(/[^0-9.]/g, "") }))} placeholder="Enter amount" placeholderTextColor={colors.muted} keyboardType="numeric" style={styles.input}/></View></>}

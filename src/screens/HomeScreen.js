@@ -29,6 +29,7 @@ import { debounce } from "../utils/debounce";
 import { createSessionToken } from "../utils/sessionToken";
 import { getLocationDisplayText } from "../utils/locationDisplay";
 import colors, { radius, shadow, spacing } from "../constants/colors";
+import SavedRoutesSkeleton from "../components/skeleton/SavedRoutesSkeleton";
 
 const MIN_AUTOCOMPLETE_LENGTH = 3;
 const AUTOCOMPLETE_DEBOUNCE_MS = 350;
@@ -110,6 +111,8 @@ export default function HomeScreen({ navigation, route }) {
   const [routeInfo, setRouteInfo] = useState(null);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [savedRoutes, setSavedRoutes] = useState([]);
+  const [savedRoutesLoading, setSavedRoutesLoading] = useState(true);
+  const [savedRoutesError, setSavedRoutesError] = useState(null);
   const [saveModalVisible, setSaveModalVisible] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveLabelType, setSaveLabelType] = useState("FAVORITE");
@@ -120,7 +123,8 @@ export default function HomeScreen({ navigation, route }) {
   ];
 
   const loadSavedRoutes = useCallback(async () => {
-    try { setSavedRoutes((await getSavedRoutes()).data || []); } catch (error) { console.warn("[saved-routes] unavailable", error?.message || error); }
+    setSavedRoutesLoading(true);
+    try { setSavedRoutes((await getSavedRoutes()).data || []); setSavedRoutesError(null); } catch (error) { console.warn("[saved-routes] unavailable", error?.message || error); setSavedRoutesError("Saved trips are unavailable."); } finally { setSavedRoutesLoading(false); }
   }, []);
 
   useEffect(() => { loadSavedRoutes(); }, [loadSavedRoutes]);
@@ -642,8 +646,10 @@ export default function HomeScreen({ navigation, route }) {
 
         <View style={styles.savedSection}>
           <View style={styles.savedHeader}><Text style={styles.savedTitle}>Saved Trips</Text>{savedRoutes.length > 0 && <TouchableOpacity onPress={() => navigation.getParent()?.navigate("SavedRoutes")}><Text style={styles.viewAll}>See all</Text></TouchableOpacity>}</View>
+          {savedRoutesLoading && !savedRoutes.length ? <SavedRoutesSkeleton count={1} /> : null}
+          {!savedRoutesLoading && savedRoutesError ? <TouchableOpacity onPress={loadSavedRoutes}><Text style={styles.savedHint}>{savedRoutesError} Tap to retry.</Text></TouchableOpacity> : null}
           {savedRoutes.slice(0, 3).map((item) => <TouchableOpacity key={item.id} style={styles.savedRow} onPress={() => { applyPickup(toCanonicalLocation(item.pickup)); applyDropoff(toCanonicalLocation(item.destination)); }}><Text style={styles.savedRouteName}>{item.name}</Text><Text style={styles.savedRoutePath}>{getLocationDisplayText(item.pickup)} → {getLocationDisplayText(item.destination)}</Text></TouchableOpacity>)}
-          {!savedRoutes.length ? <Text style={styles.savedHint}>Save routes you travel often for quicker fare comparisons.</Text> : null}
+          {!savedRoutesLoading && !savedRoutesError && !savedRoutes.length ? <Text style={styles.savedHint}>Save routes you travel often for quicker fare comparisons.</Text> : null}
           <TouchableOpacity style={styles.savedLink} onPress={() => navigation.getParent()?.navigate("SavedRoutes")}><Text style={styles.savedLinkText}>{savedRoutes.length ? "Manage Saved Trips" : "View Saved Trips"}</Text></TouchableOpacity>
         </View>
       </ScrollView>

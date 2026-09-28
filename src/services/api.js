@@ -64,6 +64,7 @@ export async function requestPasswordReset(email) { return authData(await apiCli
 export async function verifyPasswordReset(email, code) { return authData(await apiClient.post("/auth/forgot-password/verify", { email, code }, { skipAuth: true })); }
 export async function resetPassword(resetToken, newPassword, confirmPassword = newPassword) { return authData(await apiClient.post("/auth/reset-password", { resetToken, newPassword, confirmPassword }, { skipAuth: true })); }
 export async function authMe() { return authData(await apiClient.get("/auth/me")); }
+export async function updateProfile(name) { return authData(await apiClient.patch("/auth/me", { name })); }
 export async function getPreferences() { return authData(await apiClient.get("/preferences")); }
 export async function updatePreferences(preferences) { return authData(await apiClient.put("/preferences", preferences)); }
 

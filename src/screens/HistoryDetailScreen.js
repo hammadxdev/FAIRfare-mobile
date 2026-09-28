@@ -1,18 +1,20 @@
 import React from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import { getHistory } from "../services/api";
 import { formatCurrency } from "../utils/formatCurrency";
 import { PROVIDER_LAUNCH_CONFIG } from "../services/providerLauncher";
+import SkeletonCard from "../components/skeleton/SkeletonCard";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 
 export default function HistoryDetailScreen({ route, navigation }) {
   const [entry, setEntry] = React.useState(null); const [error, setError] = React.useState(false);
   const load = React.useCallback(() => { setError(false); setEntry(null); getHistory(route.params?.historyId).then((res) => setEntry(res.data)).catch(() => setError(true)); }, [route.params?.historyId]);
   React.useEffect(() => { load(); }, [load]);
   if (error) return <View style={styles.flex}><ErrorState title="History unavailable" message="This comparison could not be loaded." onRetry={load} /></View>;
-  if (!entry) return <View style={styles.loading}><ActivityIndicator color={colors.accent} /><Text style={styles.muted}>Loading comparison…</Text></View>;
+  if (!entry) return <ScrollView style={styles.flex} contentContainerStyle={styles.content}><SkeletonCard><SkeletonBlock width="24%" height={12} /><SkeletonBlock width="82%" height={18} style={{ marginTop: spacing.md }} /><SkeletonBlock width="72%" height={18} style={{ marginTop: spacing.sm }} /><SkeletonBlock width="45%" height={12} style={{ marginTop: spacing.lg }} /></SkeletonCard><SkeletonCard><SkeletonBlock width="52%" height={17} /><SkeletonBlock width="78%" height={13} style={{ marginTop: spacing.md }} /><SkeletonBlock width="64%" height={13} style={{ marginTop: spacing.sm }} /></SkeletonCard></ScrollView>;
   const compareAgain = () => navigation.navigate("MainTabs", { screen: "Home", params: { compareAgain: entry } });
   return <ScrollView style={styles.flex} contentContainerStyle={styles.content}><View style={styles.card}><Text style={styles.eyebrow}>Route</Text><Text style={styles.route}>{entry.pickup.label}</Text><Text style={styles.arrow}>↓</Text><Text style={styles.route}>{entry.destination.label}</Text><Text style={styles.date}>{new Date(entry.searchedAt).toLocaleString()}</Text><View style={styles.stats}><Text style={styles.stat}>{entry.route?.distanceMeters == null ? "Distance unavailable" : `${(entry.route.distanceMeters / 1000).toFixed(1)} km`}</Text><Text style={styles.stat}>{entry.route?.durationSeconds == null ? "Duration unavailable" : `~${Math.round(entry.route.durationSeconds / 60)} min`}</Text></View></View><Text style={styles.heading}>Historical quote snapshots</Text><Text style={styles.noteTop}>Fares shown here are from this previous comparison.</Text><View style={styles.card}>{entry.quotes.map((quote, index) => <View style={[styles.quote, index > 0 && styles.divider]} key={`${quote.provider}-${index}`}><View style={styles.quoteCopy}><Text style={styles.provider}>{PROVIDER_LAUNCH_CONFIG[quote.provider]?.label || quote.provider}</Text><Text style={styles.muted}>{quote.category || "Category unavailable"} · {quote.availability || "Availability unavailable"}</Text></View><Text style={styles.fare}>{quote.fare == null ? "Unavailable" : formatCurrency(quote.fare)}</Text></View>)}</View><TouchableOpacity style={styles.button} onPress={compareAgain}><Text style={styles.buttonText}>Compare Again</Text></TouchableOpacity><Text style={styles.note}>Compare Again performs a fresh fare comparison; these historical quotes are not reused.</Text></ScrollView>;
 }

@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from "react";
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import { useAuth } from "../context/AuthContext";
 import AppHeader from "../components/AppHeader";
@@ -8,6 +8,7 @@ import { APP_NAME, APP_VERSION } from "../constants/appInfo";
 import { getPreferences } from "../services/api";
 import { formatPKR } from "../utils/formatCurrency";
 import SettingsSection from "../components/settings/SettingsSection";
+import SettingsSkeleton from "../components/skeleton/SettingsSkeleton";
 
 const VEHICLES = [["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"], ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"]];
 const PRIORITIES = { CHEAPEST: "Cheapest fare", FASTEST_PICKUP: "Faster pickup", BALANCED: "Balanced" };
@@ -33,8 +34,8 @@ export default function SettingsRootScreen({ navigation }) {
   }, []));
   const displayName = user?.name || "Fair Fare user"; const initial = displayName.trim().charAt(0).toUpperCase() || "F";
   return <View style={styles.flex}><AppHeader title="Settings" subtitle="Manage your account and ride preferences" showLogo={false}/><ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-    <Section>PROFILE</Section><TouchableOpacity style={styles.profile} onPress={() => navigation.navigate("AccountDetails")} activeOpacity={0.75}><View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View><View style={styles.profileCopy}><Text style={styles.profileName}>{displayName}</Text><Text style={styles.profileEmail}>{user?.email || ""}</Text></View><Text style={styles.chevron}>›</Text></TouchableOpacity>
-    <Section>RIDE PREFERENCES</Section><View style={styles.group}>{loading ? <View style={styles.loading}><ActivityIndicator color={colors.accent}/><Text style={styles.rowValue}>Loading preferences…</Text></View> : <><Row icon="◉" title="Preferred vehicle" value={summary(preferences, "preferred")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "preferred" })}/><Row icon="⊘" title="Avoid vehicle types" value={summary(preferences, "avoided")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "avoided" })}/><Row icon="₨" title="Typical budget" value={summary(preferences, "budget")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "budget" })}/><Row icon="⚖" title="Ride priority" value={summary(preferences, "priority")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "priority" })} last/></>}</View>{error ? <Text style={styles.error}>{error}</Text> : null}
+    <Section>PROFILE</Section><TouchableOpacity style={styles.profile} onPress={() => navigation.navigate("Profile")} activeOpacity={0.75} accessibilityRole="button" accessibilityLabel="Open profile"><View style={styles.avatar}><Text style={styles.avatarText}>{initial}</Text></View><View style={styles.profileCopy}><Text style={styles.profileName}>{displayName}</Text><Text style={styles.profileEmail}>{user?.email || ""}</Text></View><Text style={styles.chevron}>›</Text></TouchableOpacity>
+    <Section>RIDE PREFERENCES</Section><View style={styles.group}>{loading ? <SettingsSkeleton /> : <><Row icon="◉" title="Preferred vehicle" value={summary(preferences, "preferred")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "preferred" })}/><Row icon="⊘" title="Avoid vehicle types" value={summary(preferences, "avoided")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "avoided" })}/><Row icon="₨" title="Typical budget" value={summary(preferences, "budget")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "budget" })}/><Row icon="⚖" title="Ride priority" value={summary(preferences, "priority")} onPress={() => navigation.navigate("PreferenceEditor", { mode: "priority" })} last/></>}</View>{error ? <Text style={styles.error}>{error}</Text> : null}
     <Section>APP & SUPPORT</Section><View style={styles.group}><Row icon="ⓘ" title="About Fair Fare" value="Learn how Fair Fare works" onPress={() => navigation.navigate("AboutFairFare")}/><Row icon="▤" title="Terms & Conditions" value="How the service works" onPress={() => navigation.navigate("Terms")}/><Row icon="▣" title="Privacy Policy" value="How information is handled" onPress={() => navigation.navigate("Privacy")}/><Row icon="?" title="Help & Support" value="Answers to common questions" onPress={() => navigation.navigate("HelpSupport")} last/></View>
     <Section>APP INFO</Section><View style={styles.info}><Text style={styles.infoTitle}>{APP_NAME}</Text><Text style={styles.infoVersion}>Version {APP_VERSION}</Text></View><Section>ACCOUNT</Section><TouchableOpacity style={styles.logout} onPress={logout} activeOpacity={0.75}><Text style={styles.logoutIcon}>↪</Text><Text style={styles.logoutText}>Log out</Text></TouchableOpacity>
   </ScrollView></View>;

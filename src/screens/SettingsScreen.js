@@ -4,6 +4,8 @@ import { useAuth } from "../context/AuthContext";
 import AppHeader from "../components/AppHeader";
 import colors, { radius, spacing } from "../constants/colors";
 import { getPreferences, updatePreferences } from "../services/api";
+import SkeletonCard from "../components/skeleton/SkeletonCard";
+import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 
 const VEHICLES = [
   ["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"],
@@ -38,7 +40,7 @@ export default function SettingsScreen() {
   return <View style={styles.flex}><AppHeader title="Settings" subtitle="Your account and app preferences" showLogo={false} /><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <Text style={styles.section}>ACCOUNT</Text><View style={styles.card}><Text style={styles.label}>Name</Text><Text style={styles.value}>{user?.name}</Text><Text style={styles.label}>Email</Text><Text style={styles.value}>{user?.email}</Text></View>
     <Text style={styles.section}>RIDE PREFERENCES</Text>
-    {loading ? <View style={styles.loading}><ActivityIndicator color={colors.accent} /><Text style={styles.muted}>Loading preferences…</Text></View> : <View style={styles.card}>
+    {loading ? <SkeletonCard><SkeletonBlock width="48%" height={17} /><SkeletonBlock width="88%" height={14} style={{ marginTop: spacing.md }} /><SkeletonBlock width="72%" height={14} style={{ marginTop: spacing.sm }} /><SkeletonBlock width="100%" height={48} borderRadius={radius.md} style={{ marginTop: spacing.lg }} /></SkeletonCard> : <View style={styles.card}>
       <Text style={styles.fieldTitle}>Preferred vehicle</Text><View style={styles.options}>{[[null, "No preference"], ...VEHICLES].map(([value, label]) => <TouchableOpacity key={label} style={[styles.option, preferences.preferredVehicleType === value && styles.optionSelected]} onPress={() => setPreferences((current) => ({ ...current, preferredVehicleType: value }))}><Text style={[styles.optionText, preferences.preferredVehicleType === value && styles.optionTextSelected]}>{label}</Text></TouchableOpacity>)}</View>
       <Text style={styles.fieldTitle}>Avoid vehicle types</Text><Text style={styles.muted}>Select any vehicle types you generally avoid.</Text><View style={styles.options}>{VEHICLES.map(([value, label]) => <TouchableOpacity key={value} style={[styles.option, preferences.avoidedVehicleTypes.includes(value) && styles.optionSelected]} onPress={() => toggleAvoided(value)}><Text style={[styles.checkbox, preferences.avoidedVehicleTypes.includes(value) && styles.checkboxSelected]}>{preferences.avoidedVehicleTypes.includes(value) ? "✓" : "□"}</Text><Text style={[styles.optionText, preferences.avoidedVehicleTypes.includes(value) && styles.optionTextSelected]}>{label}</Text></TouchableOpacity>)}</View>
       <Text style={styles.fieldTitle}>Typical budget</Text><TextInput style={styles.input} value={preferences.typicalBudget} onChangeText={(value) => setPreferences((current) => ({ ...current, typicalBudget: value }))} placeholder="Optional amount" keyboardType="numeric"/><Text style={styles.currency}>PKR</Text>
