@@ -1,9 +1,13 @@
 import { Alert, Linking } from "react-native";
+const { getIndriveLaunchUris, openFirstAvailable } = require("./providerLauncherLogic.cjs");
 
-// Only the existing inDrive URL is configured. Yango and Bykea have no
-// verified launch link in this repository, so no undocumented URI is made up.
+// VERIFIED inDrive behavior from the installed Android app:
+// - app launch through indrive://open and https://indrive.com/app
+// - one generic geo location/map handoff through geo:<lat>,<lng>
+// NOT YET VERIFIED: simultaneous pickup + destination, category, fare, and
+// order creation. Fair Fare does not claim booking completion.
 export const PROVIDER_LAUNCH_CONFIG = {
-  indrive: { label: "inDrive", url: "https://indrive.com" },
+  indrive: { label: "inDrive", url: "https://indrive.com/app" },
   yango: { label: "Yango", url: null },
   bykea: { label: "Bykea", url: null },
   // These are the existing backend slugs for the current Yango/Bykea
@@ -19,12 +23,12 @@ export async function openProvider(providerId, tripContext = {}) {
     Alert.alert("Unable to open provider", `Unable to open ${label}. Please install or open the provider app manually.`);
     return false;
   }
-  try {
-    if (!(await Linking.canOpenURL(config.url))) throw new Error("Unsupported provider link");
-    await Linking.openURL(config.url);
-    return true;
-  } catch (error) {
-    Alert.alert("Unable to open provider", `Unable to open ${label}. Please install or open the provider app manually.`);
-    return false;
-  }
+  const launchUris = providerId === "indrive"
+    ? getIndriveLaunchUris(tripContext)
+    : [config.url];
+
+  if (await openFirstAvailable(launchUris, Linking)) return true;
+
+  Alert.alert("Unable to open provider", `Unable to open ${label}. Please install or open the provider app manually.`);
+  return false;
 }
