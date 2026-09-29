@@ -123,8 +123,8 @@ export async function getAiConversation(id) { const response = await apiClient.g
 export async function renameAiConversation(id, title) { const response = await apiClient.patch(`/ai/conversations/${id}`, { title }); return response.data; }
 export async function updateAiConversation(id, changes) { const response = await apiClient.patch(`/ai/conversations/${id}`, changes); return response.data; }
 export async function deleteAiConversation(id) { const response = await apiClient.delete(`/ai/conversations/${id}`); return response.data; }
-export async function askAi(message, comparisonId, conversationId) {
-  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}) });
+export async function askAi(message, comparisonId, conversationId, clientMessageId) {
+  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}), ...(clientMessageId ? { clientMessageId } : {}) });
   return response.data;
 }
 
