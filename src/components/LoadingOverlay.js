@@ -1,30 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { Modal, View, Text, StyleSheet, ScrollView } from "react-native";
-import FareResultsSkeleton from "./skeleton/FareResultsSkeleton";
+import React from "react";
+import { Modal, View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import colors, { radius, spacing } from "../constants/colors";
 
-const SUBTITLES = [
-  "Checking nearby ride providers",
-  "Finding the fairest price",
-  "Calculating route and estimated fare",
-  "Almost there...",
-];
-const SUBTITLE_INTERVAL_MS = 1500;
-
 export default function LoadingOverlay({ visible }) {
-  const [subtitleIndex, setSubtitleIndex] = useState(0);
-
-  useEffect(() => {
-    if (!visible) return undefined;
-
-    setSubtitleIndex(0);
-    const interval = setInterval(() => {
-      setSubtitleIndex((prev) => (prev + 1) % SUBTITLES.length);
-    }, SUBTITLE_INTERVAL_MS);
-
-    return () => clearInterval(interval);
-  }, [visible]);
-
   if (!visible) return null;
 
   return (
@@ -32,10 +10,8 @@ export default function LoadingOverlay({ visible }) {
       <View style={styles.overlay}>
         <View style={styles.card}>
           <Text style={styles.title}>Comparing fares</Text>
-          <Text style={styles.subtitle}>{SUBTITLES[subtitleIndex]}</Text>
-          <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false}>
-            <FareResultsSkeleton />
-          </ScrollView>
+          <Text style={styles.subtitle}>Finding the fairest price</Text>
+          <ActivityIndicator accessibilityLabel="Comparing fares" color={colors.accent} size="small" style={styles.loader} />
         </View>
       </View>
     </Modal>
@@ -69,8 +45,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
     textAlign: "center",
-    minHeight: 34,
   },
-  results: { width: "100%", maxHeight: 430, marginTop: spacing.md },
-  resultsContent: { paddingBottom: spacing.sm },
+  loader: { marginTop: spacing.lg },
 });
