@@ -525,7 +525,8 @@ export default function HomeScreen({ navigation, route }) {
     } catch (err) {
       console.error("compareFares failed:", err?.message || err);
 
-      if (ENABLE_MOCK_FALLBACK) {
+      const allowDevMockFallback = ENABLE_MOCK_FALLBACK && typeof __DEV__ !== "undefined" && __DEV__;
+      if (allowDevMockFallback) {
         navigation.navigate("Results", { result: { ...mockCompareFaresResponse, pickup: payload.pickup, dropoff: payload.dropoff, vehicleType } });
       } else {
         setErrorMessage(

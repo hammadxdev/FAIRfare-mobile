@@ -21,3 +21,15 @@ test("only a refresh 401 is treated as expired; network/5xx remains retryable", 
   assert.equal(isRefreshAuthFailure({ response: { status: 500 } }), false);
   assert.equal(isRefreshAuthFailure({ code: "ENOTFOUND" }), false);
 });
+
+test("terminal refresh failures are single-flight and transient failures do not expire session", async () => {
+  let calls = 0;
+  const refreshOnce = createRefreshSingleFlight(async () => {
+    calls += 1;
+    throw { response: { status: 403 } };
+  });
+  await assert.rejects(Promise.all([refreshOnce(), refreshOnce()]));
+  assert.equal(calls, 1);
+  assert.equal(isRefreshAuthFailure({ code: "ECONNABORTED" }), false);
+  assert.equal(isRefreshAuthFailure({ response: { status: 503 } }), false);
+});
