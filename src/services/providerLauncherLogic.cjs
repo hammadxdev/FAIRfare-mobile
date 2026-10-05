@@ -23,6 +23,31 @@ function buildGeoUri(location) {
   return `geo:${latitude},${longitude}`;
 }
 
+function buildYangoRouteUrl(tripContext = {}) {
+  const pickup = tripContext.pickup || {};
+  const destination = tripContext.destination || {};
+  if (!hasValidCoordinate(pickup) || !hasValidCoordinate(destination)) return null;
+  const startLat = getCanonicalCoordinate(pickup, "lat", "latitude");
+  const startLon = getCanonicalCoordinate(pickup, "lng", "longitude");
+  const endLat = getCanonicalCoordinate(destination, "lat", "latitude");
+  const endLon = getCanonicalCoordinate(destination, "lng", "longitude");
+  const params = new URLSearchParams({
+    "start-lat": String(startLat), "start-lon": String(startLon),
+    "end-lat": String(endLat), "end-lon": String(endLon),
+  });
+  return `https://yango.go.link/route?${params.toString()}`;
+}
+
+function getYangoLaunchUris(tripContext = {}) {
+  return [buildYangoRouteUrl(tripContext), "https://yango.com/en_pk/"].filter(Boolean);
+}
+
+function getBykeaLaunchUris() {
+  // Bykea publishes app/ride availability, but no verified public route-prefill
+  // contract. Open the official site, which safely directs users to the app.
+  return ["https://www.bykea.com/pk/"];
+}
+
 function getIndriveLaunchUris(tripContext = {}) {
   // Physical-device evidence verifies a generic map-location handoff only.
   // The current handoff uses the explicitly supplied pickup coordinate as its
@@ -46,6 +71,9 @@ async function openFirstAvailable(uris, { canOpenURL, openURL }) {
 
 module.exports = {
   buildGeoUri,
+  buildYangoRouteUrl,
+  getYangoLaunchUris,
+  getBykeaLaunchUris,
   getIndriveLaunchUris,
   hasValidCoordinate,
   normalizeCoordinate,

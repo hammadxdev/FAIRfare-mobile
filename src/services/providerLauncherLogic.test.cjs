@@ -3,6 +3,9 @@ const assert = require("node:assert/strict");
 const {
   buildGeoUri,
   getIndriveLaunchUris,
+  buildYangoRouteUrl,
+  getYangoLaunchUris,
+  getBykeaLaunchUris,
   hasValidCoordinate,
   normalizeCoordinate,
   openFirstAvailable,
@@ -77,4 +80,17 @@ test("open fallback failure reaches the verified HTTPS app link", async () => {
   );
   assert.equal(opened, "https://indrive.com/app");
   assert.deepEqual(attempted, ["geo:31.5,74.3", "indrive://open", "https://indrive.com/app"]);
+});
+
+test("builds the documented Yango route link with encoded coordinates", () => {
+  assert.equal(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }), "https://yango.go.link/route?start-lat=31.5&start-lon=74.3&end-lat=31.6&end-lon=74.4");
+});
+
+test("rejects invalid Yango coordinates and falls back to the official site", () => {
+  assert.equal(buildYangoRouteUrl({ pickup: { lat: 91, lng: 74.3 }, destination: { lat: 31.6, lng: 74.4 } }), null);
+  assert.deepEqual(getYangoLaunchUris({ pickup: {}, destination: {} }), ["https://yango.com/en_pk/"]);
+});
+
+test("Bykea exposes only the verified official site fallback", () => {
+  assert.deepEqual(getBykeaLaunchUris(), ["https://www.bykea.com/pk/"]);
 });

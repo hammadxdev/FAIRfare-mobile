@@ -31,8 +31,7 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         </View>
         <View style={styles.fareBlock}>
           <Text style={styles.fareLabel}>Current fare</Text>
-          {result.dataSource === "SIMULATED" && <Text style={styles.simulatedLabel}>Simulated fare</Text>}
-          <Text style={styles.fare} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{isAvailable ? formatPKR(fare) : "Unavailable"}</Text>
+          <Text style={styles.fare} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{isAvailable ? formatPKR(fare) : "Unavailable"}</Text>
         </View>
       </View>
 
@@ -61,7 +60,7 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         </View>
       )}
 
-      {isAvailable && recommendation && (
+      {isAvailable && recommendation && recommendation.status !== "INSUFFICIENT_DATA" && (
         <View style={[styles.recommendationBox, recommendation.status === "BOOK_NOW" && styles.recommendationBook, recommendation.status === "WAIT" && styles.recommendationWait]}>
           <View style={styles.recommendationHeader}>
             <Text style={styles.recommendationLabel}>Recommendation</Text>
@@ -151,17 +150,13 @@ const styles = StyleSheet.create({
   fareBlock: {
     alignItems: "flex-end",
     flexShrink: 0,
-    maxWidth: 112,
+    minWidth: 112,
+    maxWidth: 150,
   },
   fareLabel: {
     color: colors.muted,
     fontSize: 10,
     fontWeight: "700",
-    marginBottom: 2,
-  },
-  simulatedLabel: {
-    color: colors.muted,
-    fontSize: 9,
     marginBottom: 2,
   },
   predictionBox: {
