@@ -48,13 +48,14 @@ export default function RootNavigator() {
         }}
       />
       <Stack.Screen name="HistoryDetail" component={HistoryDetailScreen} options={{ headerShown: true, title: "Past comparison", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
-      <Stack.Screen name="SavedRoutes" component={SavedRoutesScreen} options={{ headerShown: true, title: "Saved Trips", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} /></Stack.Group>}
+      <Stack.Screen name="SavedRoutes" component={SavedRoutesScreen} options={{ headerShown: true, title: "Saved Trips", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: true, title: "Profile", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="PreferenceEditor" component={PreferenceEditorScreen} options={({ route }) => ({ headerShown: true, title: route.params?.mode === "preferred" ? "Preferred vehicle" : route.params?.mode === "avoided" ? "Avoid vehicle types" : route.params?.mode === "budget" ? "Typical budget" : "Ride priority", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary })} />
       <Stack.Screen name="AboutFairFare" component={AboutScreen} options={{ headerShown: true, title: "About Fair Fare", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: true, title: "Terms & Conditions", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: true, title: "Privacy Policy", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="HelpSupport" component={HelpScreen} options={{ headerShown: true, title: "Help & Support", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
+      </Stack.Group>}
       </Stack.Navigator>
       <Modal transparent visible={Boolean(sessionNotice)} animationType="fade"><View style={styles.backdrop}><View style={styles.dialog}><Text style={styles.title}>{sessionNotice?.title || "Session issue"}</Text><Text style={styles.message}>{sessionNotice?.message || sessionNotice}</Text><TouchableOpacity style={styles.button} onPress={dismissSessionNotice}><Text style={styles.buttonText}>{sessionNotice?.action || "Continue"}</Text></TouchableOpacity></View></View></Modal>
   </>);

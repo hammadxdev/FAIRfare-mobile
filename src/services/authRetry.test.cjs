@@ -17,6 +17,7 @@ test("concurrent protected 401s share one refresh operation", async () => {
 
 test("only a refresh 401 is treated as expired; network/5xx remains retryable", () => {
   assert.equal(isRefreshAuthFailure({ response: { status: 401 } }), true);
+  assert.equal(isRefreshAuthFailure({ response: { status: 403 } }), true);
   assert.equal(isRefreshAuthFailure({ response: { status: 500 } }), false);
   assert.equal(isRefreshAuthFailure({ code: "ENOTFOUND" }), false);
 });

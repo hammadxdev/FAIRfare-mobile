@@ -1,5 +1,7 @@
 function isRefreshAuthFailure(error) {
-  return error?.response?.status === 401;
+  // Only an auth response from /auth/refresh is conclusive. Network errors,
+  // timeouts, and 5xx responses must preserve the locally stored session.
+  return error?.response?.status === 401 || error?.response?.status === 403;
 }
 
 function createRefreshSingleFlight(refresh) {

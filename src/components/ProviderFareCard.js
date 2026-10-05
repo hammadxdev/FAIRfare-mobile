@@ -31,6 +31,7 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         </View>
         <View style={styles.fareBlock}>
           <Text style={styles.fareLabel}>Current fare</Text>
+          {result.dataSource === "SIMULATED" && <Text style={styles.simulatedLabel}>Simulated fare</Text>}
           <Text style={styles.fare} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.85}>{isAvailable ? formatPKR(fare) : "Unavailable"}</Text>
         </View>
       </View>
@@ -156,6 +157,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 10,
     fontWeight: "700",
+    marginBottom: 2,
+  },
+  simulatedLabel: {
+    color: colors.muted,
+    fontSize: 9,
     marginBottom: 2,
   },
   predictionBox: {
