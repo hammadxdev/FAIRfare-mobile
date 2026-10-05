@@ -10,6 +10,13 @@ function capitalize(value) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function weatherLabel(weather) {
+  if (!weather || !weather.condition || weather.condition === "UNKNOWN") return null;
+  const condition = weather.condition.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const temperature = Number.isFinite(Number(weather.temperatureC)) ? ` • ${Math.round(Number(weather.temperatureC))}°C` : "";
+  return `${condition}${temperature}`;
+}
+
 export default function ResultsScreen({ route, navigation }) {
   const result = route.params?.result;
 
@@ -25,7 +32,8 @@ export default function ResultsScreen({ route, navigation }) {
     );
   }
 
-  const { pickup, dropoff, vehicleType, distanceKm, durationMin, results = [] } = result;
+  const { pickup, dropoff, vehicleType, distanceKm, durationMin, weather, results = [] } = result;
+  const weatherText = weatherLabel(weather);
 
   const handleOpenApp = (providerResult) => openProvider(providerResult.provider.name, { pickup, destination: dropoff });
   const handleAskAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
@@ -61,6 +69,7 @@ export default function ResultsScreen({ route, navigation }) {
             <Text style={styles.metaValue}>{durationMin} min</Text>
           </View>
         </View>
+        {weatherText ? <Text style={styles.weatherText}>Weather at pickup: {weatherText}</Text> : null}
       </View>
 
       <TouchableOpacity style={styles.askAiButton} onPress={handleAskAi} disabled={!result.comparisonId}>
@@ -160,6 +169,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     color: colors.primary,
+  },
+  weatherText: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: spacing.md,
   },
   sectionTitle: {
     fontSize: 13,
