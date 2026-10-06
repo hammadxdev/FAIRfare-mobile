@@ -30,6 +30,7 @@ import { createSessionToken } from "../utils/sessionToken";
 import { getLocationDisplayText } from "../utils/locationDisplay";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import SavedRoutesSkeleton from "../components/skeleton/SavedRoutesSkeleton";
+import { normalizeCompareAgainRoute } from "../utils/routePayload.cjs";
 
 const MIN_AUTOCOMPLETE_LENGTH = 3;
 const AUTOCOMPLETE_DEBOUNCE_MS = 350;
@@ -117,6 +118,8 @@ export default function HomeScreen({ navigation, route }) {
   const [saveName, setSaveName] = useState("");
   const [saveLabelType, setSaveLabelType] = useState("FAVORITE");
   const [saveLoading, setSaveLoading] = useState(false);
+  const compareAgainHandledRef = useRef(null);
+  const savedRouteHandledRef = useRef(null);
 
   const labelOptions = [
     ["HOME", "Home"], ["WORK", "Work"], ["UNIVERSITY", "University"], ["FAVORITE", "Favorite"], ["CUSTOM", "Custom"],
@@ -131,31 +134,35 @@ export default function HomeScreen({ navigation, route }) {
 
   useEffect(() => {
     const compareAgain = route?.params?.compareAgain;
-    if (!compareAgain) return;
-    const nextPickup = {
-      name: compareAgain.pickup.label,
-      address: compareAgain.pickup.label,
-      lat: compareAgain.pickup.latitude,
-      lng: compareAgain.pickup.longitude,
-    };
-    const nextDropoff = {
-      name: compareAgain.dropoff.label,
-      address: compareAgain.dropoff.label,
-      lat: compareAgain.dropoff.latitude,
-      lng: compareAgain.dropoff.longitude,
-    };
-    applyPickup(nextPickup);
-    applyDropoff(nextDropoff);
+    if (!compareAgain) { compareAgainHandledRef.current = null; return; }
+    if (compareAgainHandledRef.current === compareAgain) return;
+    compareAgainHandledRef.current = compareAgain;
+    const normalized = normalizeCompareAgainRoute(compareAgain);
+    if (!normalized) {
+      if (__DEV__) console.warn("[navigation] ignored malformed compareAgain route");
+      navigation.setParams({ compareAgain: undefined });
+      return;
+    }
+    applyPickup(normalized.pickup);
+    applyDropoff(normalized.dropoff);
     navigation.setParams({ compareAgain: undefined });
-  }, [route?.params?.compareAgain]);
+  }, [navigation, route?.params?.compareAgain]);
 
   useEffect(() => {
     const saved = route?.params?.savedRoute;
-    if (!saved) return;
-    applyPickup(toCanonicalLocation(saved.pickup));
-    applyDropoff(toCanonicalLocation(saved.destination));
+    if (!saved) { savedRouteHandledRef.current = null; return; }
+    if (savedRouteHandledRef.current === saved) return;
+    savedRouteHandledRef.current = saved;
+    const normalized = normalizeCompareAgainRoute(saved);
+    if (!normalized) {
+      if (__DEV__) console.warn("[navigation] ignored malformed saved route");
+      navigation.setParams({ savedRoute: undefined });
+      return;
+    }
+    applyPickup(normalized.pickup);
+    applyDropoff(normalized.dropoff);
     navigation.setParams({ savedRoute: undefined });
-  }, [route?.params?.savedRoute]);
+  }, [navigation, route?.params?.savedRoute]);
 
   // One Google Places session token per search session (per field); reset to
   // null after a place is selected so the next search starts a fresh one.
