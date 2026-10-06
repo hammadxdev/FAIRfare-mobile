@@ -550,7 +550,15 @@ export default function HomeScreen({ navigation, route }) {
     try {
       await createSavedRoute({ name: saveName.trim(), labelType: saveLabelType, pickup: { name: pickup.name, address: pickup.address, latitude: pickup.lat, longitude: pickup.lng }, destination: { name: dropoff.name, address: dropoff.address, latitude: dropoff.lat, longitude: dropoff.lng } });
       setSaveModalVisible(false); await loadSavedRoutes(); setErrorMessage("Route saved. You can compare this trip again from Saved Trips.");
-    } catch (error) { if (error?.code !== "SESSION_EXPIRED") setErrorMessage(error?.response?.data?.message || "Unable to save route. Please try again."); }
+    } catch (error) {
+      if (error?.code !== "SESSION_EXPIRED") {
+        setErrorMessage(
+          error?.response?.data?.errorCode === "ALREADY_SAVED"
+            ? "This route is already saved."
+            : error?.response?.data?.message || "Unable to save route. Please try again.",
+        );
+      }
+    }
     finally { setSaveLoading(false); }
   };
 

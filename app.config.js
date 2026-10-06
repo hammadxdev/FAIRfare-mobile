@@ -5,8 +5,8 @@
 
 if (!process.env.GOOGLE_MAPS_ANDROID_API_KEY) {
   console.warn(
-    "[app.config.js] GOOGLE_MAPS_ANDROID_API_KEY is not set — the Android map " +
-      "will still render but with Google's unbranded/dev watermark. Set it in mobile/.env.",
+    "[app.config.js] GOOGLE_MAPS_ANDROID_API_KEY is not set — native Android map tiles " +
+      "will not be authorized. Set it in mobile/.env or the EAS build environment.",
   );
 }
 
@@ -34,6 +34,9 @@ export default {
 
     android: {
       package: "com.fairfare.app",
+      // Native Android screens must receive a resized window when the IME opens.
+      // This is required by the chat screen's KeyboardAvoidingView.
+      softwareKeyboardLayoutMode: "resize",
       // Allow cleartext only for an explicitly configured local HTTP backend.
       // HTTPS/Vercel builds leave Android's cleartext protection enabled.
       usesCleartextTraffic: usesLocalHttpApi,
