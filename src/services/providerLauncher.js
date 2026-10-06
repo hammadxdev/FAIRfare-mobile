@@ -2,8 +2,9 @@ import { Alert, Linking } from "react-native";
 const { getIndriveLaunchUris, getYangoLaunchUris, getBykeaLaunchUris, openFirstAvailable } = require("./providerLauncherLogic.cjs");
 
 // VERIFIED inDrive behavior from the installed Android app:
-// - app launch through indrive://open and https://indrive.com/app
-// - one generic geo location/map handoff through geo:<lat>,<lng>
+// - indrive://open directly opens the client
+// - geo:<lat>,<lng> resolves but opens the Android chooser on the test phone
+// - https://indrive.com/app is an official fallback
 // NOT YET VERIFIED: simultaneous pickup + destination, category, fare, and
 // order creation. Fair Fare does not claim booking completion.
 export const PROVIDER_LAUNCH_CONFIG = {

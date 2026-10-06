@@ -43,17 +43,17 @@ function getYangoLaunchUris(tripContext = {}) {
 }
 
 function getBykeaLaunchUris() {
-  // Bykea publishes app/ride availability, but no verified public route-prefill
-  // contract. Open the official site, which safely directs users to the app.
+  // The installed app claims this official HTTPS domain and opens its app, but
+  // the device did not prove pickup/destination transfer from Fair Fare.
   return ["https://www.bykea.com/pk/"];
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
-  // Physical-device evidence verifies a generic map-location handoff only.
-  // The current handoff uses the explicitly supplied pickup coordinate as its
-  // source; this does not claim that inDrive treats it as pickup or destination.
+  // The device resolves indrive://open directly to the inDrive client. Generic
+  // geo opens the Android chooser on this phone, so it is a lower-priority
+  // fallback and is not claimed to prefill pickup or destination.
   const geoUri = buildGeoUri(tripContext.pickup);
-  return [geoUri, "indrive://open", "https://indrive.com/app"].filter(Boolean);
+  return ["indrive://open", geoUri, "https://indrive.com/app"].filter(Boolean);
 }
 
 async function openFirstAvailable(uris, { canOpenURL, openURL }) {

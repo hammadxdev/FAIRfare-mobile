@@ -39,10 +39,10 @@ test("does not build a geo URI when coordinates are missing", () => {
   ]);
 });
 
-test("uses the verified geo handoff before open and HTTPS fallback", () => {
+test("prefers the verified direct inDrive app launch before geo and HTTPS fallback", () => {
   assert.deepEqual(getIndriveLaunchUris({ pickup: { lat: "31.5", lng: "74.3" } }), [
-    "geo:31.5,74.3",
     "indrive://open",
+    "geo:31.5,74.3",
     "https://indrive.com/app",
   ]);
 });
@@ -52,19 +52,19 @@ test("never uses non-exported ridepush or autostart routes", () => {
   assert.equal(uris.some((uri) => uri.includes("ridepush") || uri.includes("autostart")), false);
 });
 
-test("geo launch failure falls back to indrive open", async () => {
+test("direct inDrive launch can fall back to geo", async () => {
   const attempted = [];
   const opened = await openFirstAvailable(
     getIndriveLaunchUris({ pickup: { lat: 31.5, lng: 74.3 } }),
     {
       canOpenURL: async (uri) => { attempted.push(uri); return true; },
       openURL: async (uri) => {
-        if (uri === "geo:31.5,74.3") throw new Error("geo launch failed");
+        if (uri === "indrive://open") throw new Error("app launch failed");
       },
     },
   );
-  assert.equal(opened, "indrive://open");
-  assert.deepEqual(attempted, ["geo:31.5,74.3", "indrive://open"]);
+  assert.equal(opened, "geo:31.5,74.3");
+  assert.deepEqual(attempted, ["indrive://open", "geo:31.5,74.3"]);
 });
 
 test("open fallback failure reaches the verified HTTPS app link", async () => {
@@ -74,12 +74,12 @@ test("open fallback failure reaches the verified HTTPS app link", async () => {
     {
       canOpenURL: async (uri) => { attempted.push(uri); return true; },
       openURL: async (uri) => {
-        if (uri !== "https://indrive.com/app") throw new Error("app launch failed");
+        if (uri !== "https://indrive.com/app") throw new Error("handoff failed");
       },
     },
   );
   assert.equal(opened, "https://indrive.com/app");
-  assert.deepEqual(attempted, ["geo:31.5,74.3", "indrive://open", "https://indrive.com/app"]);
+  assert.deepEqual(attempted, ["indrive://open", "geo:31.5,74.3", "https://indrive.com/app"]);
 });
 
 test("builds the documented Yango route link with encoded coordinates", () => {
@@ -91,6 +91,14 @@ test("rejects invalid Yango coordinates and falls back to the official site", ()
   assert.deepEqual(getYangoLaunchUris({ pickup: {}, destination: {} }), ["https://yango.com/en_pk/"]);
 });
 
-test("Bykea exposes only the verified official site fallback", () => {
+test("Bykea exposes the verified official app-link URL without route claims", () => {
   assert.deepEqual(getBykeaLaunchUris(), ["https://www.bykea.com/pk/"]);
+});
+
+test("unsupported and rejected paths end in a clean unavailable result", async () => {
+  const opened = await openFirstAvailable(["verified://first", "verified://second"], {
+    canOpenURL: async (uri) => uri !== "verified://first",
+    openURL: async () => { throw new Error("should not open an unsupported path"); },
+  });
+  assert.equal(opened, null);
 });
