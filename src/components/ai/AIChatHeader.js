@@ -33,7 +33,7 @@ const styles = StyleSheet.create({
   heading: { flex: 1, alignItems: "center", paddingHorizontal: spacing.sm },
   title: { color: colors.primary, fontSize: 16, fontWeight: "800" },
   subtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
-  contextChip: { flexDirection: "row", alignItems: "center", alignSelf: "center", maxWidth: "88%", marginBottom: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.softGreen },
+  contextChip: { flexDirection: "row", alignItems: "center", alignSelf: "center", maxWidth: "84%", marginBottom: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.softGreen },
   contextDot: { width: 7, height: 7, borderRadius: radius.full, backgroundColor: colors.accent, marginRight: 7 },
-  contextText: { color: colors.forest, fontSize: 11, fontWeight: "700" },
+  contextText: { color: colors.forest, fontSize: 11, fontWeight: "700", flexShrink: 1 },
 });

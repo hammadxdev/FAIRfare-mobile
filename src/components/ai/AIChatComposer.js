@@ -3,10 +3,13 @@ import { ActivityIndicator, TextInput, TouchableOpacity, View, Text, StyleSheet 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import colors, { radius, spacing } from "../../constants/colors";
 
-export default function AIChatComposer({ value, onChangeText, onSend, loading }) {
+export default function AIChatComposer({ value, onChangeText, onSend, loading, onLayout }) {
   const insets = useSafeAreaInsets();
   const disabled = !value.trim() || loading;
-  return <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}>
+  return <View
+    onLayout={onLayout}
+    style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 8) }]}
+  >
     <View style={styles.composer}>
       <TextInput value={value} onChangeText={onChangeText} placeholder="Ask about your ride..." placeholderTextColor={colors.muted} multiline maxLength={1000} editable={!loading} style={styles.input} blurOnSubmit={false} accessibilityLabel="Ride question" />
       <TouchableOpacity accessibilityLabel="Send message" accessibilityRole="button" style={[styles.send, disabled && styles.disabled]} onPress={onSend} disabled={disabled}>
