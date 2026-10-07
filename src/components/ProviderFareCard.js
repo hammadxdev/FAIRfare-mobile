@@ -1,6 +1,7 @@
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import Badge from "./Badge";
+import FareDisclaimer from "./FareDisclaimer";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import { formatPKR, formatApproxPKR } from "../utils/formatCurrency";
 
@@ -32,6 +33,7 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         <View style={styles.fareBlock}>
           <Text style={styles.fareLabel}>Current fare</Text>
           <Text style={styles.fare} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.72}>{isAvailable ? formatPKR(fare) : "Unavailable"}</Text>
+          {isAvailable && fare != null ? <FareDisclaimer /> : null}
         </View>
       </View>
 
