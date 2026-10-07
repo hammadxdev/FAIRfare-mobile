@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const {
   buildGeoUri,
   getIndriveLaunchUris,
+  getProviderLaunchUris,
   buildYangoRouteUrl,
   getYangoLaunchUris,
   getBykeaLaunchUris,
@@ -45,6 +46,14 @@ test("prefers the verified direct inDrive app launch before geo and HTTPS fallba
     "geo:31.5,74.3",
     "https://indrive.com/app",
   ]);
+});
+
+test("maps only the canonical backend provider IDs to their handoffs", () => {
+  assert.equal(getProviderLaunchUris("indrive")[0], "indrive://open");
+  assert.equal(getProviderLaunchUris("quickride")[0], "https://yango.com/en_pk/");
+  assert.equal(getProviderLaunchUris("urbancab")[0], "bykea://kl");
+  assert.deepEqual(getProviderLaunchUris("Yango"), []);
+  assert.deepEqual(getProviderLaunchUris("Bykea"), []);
 });
 
 test("never uses non-exported ridepush or autostart routes", () => {
@@ -92,13 +101,55 @@ test("rejects invalid Yango coordinates and falls back to the official site", ()
 });
 
 test("Bykea exposes the verified official app-link URL without route claims", () => {
-  assert.deepEqual(getBykeaLaunchUris(), ["https://www.bykea.com/pk/"]);
+  assert.deepEqual(getBykeaLaunchUris(), ["bykea://kl", "https://www.bykea.com/pk/"]);
 });
 
-test("unsupported and rejected paths end in a clean unavailable result", async () => {
+test("attempts openURL even when canOpenURL is false", async () => {
+  const events = [];
+  const opened = await openFirstAvailable(["verified://first"], {
+    canOpenURL: async () => false,
+    openURL: async () => undefined,
+  }, (event) => events.push(event));
+  assert.equal(opened, "verified://first");
+  assert.deepEqual(events.filter((event) => event.event === "canOpenURL")[0].result, false);
+  assert.equal(events.some((event) => event.event === "openURL" && event.attempted), true);
+});
+
+test("openURL rejection reaches the next fallback", async () => {
+  const attempted = [];
   const opened = await openFirstAvailable(["verified://first", "verified://second"], {
-    canOpenURL: async (uri) => uri !== "verified://first",
-    openURL: async () => { throw new Error("should not open an unsupported path"); },
+    canOpenURL: async () => false,
+    openURL: async (uri) => { attempted.push(uri); if (uri === "verified://first") throw new Error("handoff failed"); },
   });
-  assert.equal(opened, null);
+  assert.equal(opened, "verified://second");
+  assert.deepEqual(attempted, ["verified://first", "verified://second"]);
+});
+
+test("invokes Linking methods with their receiver preserved", async () => {
+  const linker = {
+    prefix: "bound",
+    canOpenURL(uri) {
+      assert.equal(this.prefix, "bound");
+      assert.equal(typeof uri, "string");
+      return Promise.resolve(false);
+    },
+    openURL(uri) {
+      assert.equal(this.prefix, "bound");
+      assert.equal(typeof uri, "string");
+      return Promise.resolve(uri);
+    },
+  };
+  assert.equal(await openFirstAvailable(["verified://bound"], linker), "verified://bound");
+});
+
+test("skips malformed non-string candidates without invoking Linking", async () => {
+  let invoked = false;
+  const events = [];
+  const linker = {
+    canOpenURL: async () => { invoked = true; return true; },
+    openURL: async () => { invoked = true; },
+  };
+  assert.equal(await openFirstAvailable([undefined, null, ""], linker, (event) => events.push(event)), null);
+  assert.equal(invoked, false);
+  assert.equal(events.filter((event) => event.event === "invalidCandidate").length, 3);
 });

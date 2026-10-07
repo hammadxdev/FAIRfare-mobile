@@ -67,6 +67,7 @@ export default {
           androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
         },
       ],
+      "./plugins/withProviderQueries",
     ],
 
     extra: {

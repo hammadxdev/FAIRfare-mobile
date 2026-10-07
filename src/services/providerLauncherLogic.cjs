@@ -43,9 +43,9 @@ function getYangoLaunchUris(tripContext = {}) {
 }
 
 function getBykeaLaunchUris() {
-  // The installed app claims this official HTTPS domain and opens its app, but
-  // the device did not prove pickup/destination transfer from Fair Fare.
-  return ["https://www.bykea.com/pk/"];
+  // bykea://kl is verified to open the installed Bykea client. Route transfer
+  // is intentionally not claimed; the official site remains the fallback.
+  return ["bykea://kl", "https://www.bykea.com/pk/"];
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
@@ -56,14 +56,50 @@ function getIndriveLaunchUris(tripContext = {}) {
   return ["indrive://open", geoUri, "https://indrive.com/app"].filter(Boolean);
 }
 
-async function openFirstAvailable(uris, { canOpenURL, openURL }) {
+function getProviderLaunchUris(providerId, tripContext = {}) {
+  if (providerId === "indrive") return getIndriveLaunchUris(tripContext);
+  if (providerId === "quickride") return getYangoLaunchUris(tripContext);
+  if (providerId === "urbancab") return getBykeaLaunchUris();
+  return [];
+}
+
+function candidateDescription(uri) {
+  try {
+    const parsed = new URL(uri);
+    return { type: parsed.protocol === "https:" ? "https" : "scheme", scheme: parsed.protocol.replace(":", ""), domain: parsed.hostname || null };
+  } catch {
+    return { type: "unknown", scheme: null, domain: null };
+  }
+}
+
+async function openFirstAvailable(uris, linker, onEvent = () => {}) {
   for (const uri of uris) {
+    if (typeof uri !== "string" || uri.length === 0) {
+      const error = new TypeError("Provider launch candidate must be a non-empty string");
+      onEvent({ event: "invalidCandidate", uriType: typeof uri, errorName: error.name, errorMessage: error.message });
+      continue;
+    }
+    const candidate = candidateDescription(uri);
+    onEvent({ event: "candidate", uri, ...candidate });
+    let canOpen = null;
     try {
-      if (!(await canOpenURL(uri))) continue;
-      await openURL(uri);
+      canOpen = await linker.canOpenURL(uri);
+      onEvent({ event: "canOpenURL", uri, result: canOpen });
+    } catch (error) {
+      onEvent({ event: "canOpenURL", uri, result: "rejected", errorName: error?.name || "Error", errorMessage: error?.message || String(error) });
+    }
+
+    // Android package visibility can make canOpenURL false even though the
+    // platform can resolve the URI. It is telemetry/safety information, not a
+    // gate for a verified handoff candidate.
+    try {
+      onEvent({ event: "openURL", uri, attempted: true, canOpenURL: canOpen });
+      await linker.openURL(uri);
+      onEvent({ event: "openURL", uri, result: "resolved" });
       return uri;
     } catch (error) {
-      // Try the next verified/safe fallback.
+      onEvent({ event: "openURL", uri, result: "rejected", errorName: error?.name || "Error", errorMessage: error?.message || String(error) });
+      // Try the next verified/safe fallback after the actual handoff fails.
     }
   }
   return null;
@@ -75,6 +111,7 @@ module.exports = {
   getYangoLaunchUris,
   getBykeaLaunchUris,
   getIndriveLaunchUris,
+  getProviderLaunchUris,
   hasValidCoordinate,
   normalizeCoordinate,
   openFirstAvailable,

@@ -1,5 +1,5 @@
 import { Alert, Linking } from "react-native";
-const { getIndriveLaunchUris, getYangoLaunchUris, getBykeaLaunchUris, openFirstAvailable } = require("./providerLauncherLogic.cjs");
+const { getProviderLaunchUris, openFirstAvailable } = require("./providerLauncherLogic.cjs");
 
 // VERIFIED inDrive behavior from the installed Android app:
 // - indrive://open directly opens the client
@@ -20,14 +20,24 @@ export const PROVIDER_LAUNCH_CONFIG = {
 export async function openProvider(providerId, tripContext = {}) {
   const config = PROVIDER_LAUNCH_CONFIG[providerId];
   const label = config?.label || "provider";
-  const launchUris = providerId === "indrive"
-    ? getIndriveLaunchUris(tripContext)
-    : (providerId === "yango" || providerId === "quickride")
-      ? getYangoLaunchUris(tripContext)
-      : getBykeaLaunchUris();
+  const launchUris = getProviderLaunchUris(providerId, tripContext);
 
-  if (await openFirstAvailable(launchUris, Linking)) return true;
+  const onEvent = __DEV__
+    ? (event) => {
+      if (event.event === "candidate") {
+        console.log("[ProviderLaunch] requested", providerId, event.type, event.scheme || "", event.domain || "");
+      } else if (event.event === "canOpenURL") {
+        console.log("[ProviderLaunch] canOpenURL", providerId, event.result, event.errorName || "", event.errorMessage || "");
+      } else if (event.event === "openURL") {
+        console.log("[ProviderLaunch] openURL", providerId, event.result, event.errorName || "", event.errorMessage || "");
+      } else if (event.event === "invalidCandidate") {
+        console.warn("[ProviderLaunch] invalid candidate", providerId, event.uriType, event.errorName, event.errorMessage);
+      }
+    }
+    : undefined;
 
-  Alert.alert("Unable to open provider", `Unable to open ${label}. Please install or open the provider app manually.`);
+  if (await openFirstAvailable(launchUris, Linking, onEvent)) return true;
+
+  Alert.alert("Unable to open provider", `Unable to open ${label} right now.`);
   return false;
 }

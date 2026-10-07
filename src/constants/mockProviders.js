@@ -29,7 +29,7 @@ const mockCompareFaresResponse = {
       },
     },
     {
-      provider: { id: 1, name: "ridego", displayName: "inDrive" },
+      provider: { id: 1, name: "indrive", displayName: "inDrive" },
       fare: 201,
       etaMin: 4,
       isCheapest: false,

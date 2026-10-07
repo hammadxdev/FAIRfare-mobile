@@ -17,6 +17,15 @@ function weatherLabel(weather) {
   return `${condition}${temperature}`;
 }
 
+function hasValidCoordinatePair(location) {
+  const latitudeValue = location?.lat ?? location?.latitude;
+  const longitudeValue = location?.lng ?? location?.longitude;
+  if (latitudeValue === null || latitudeValue === undefined || latitudeValue === "" || longitudeValue === null || longitudeValue === undefined || longitudeValue === "") return false;
+  const latitude = Number(latitudeValue);
+  const longitude = Number(longitudeValue);
+  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+}
+
 export default function ResultsScreen({ route, navigation }) {
   const result = route.params?.result;
 
@@ -35,7 +44,16 @@ export default function ResultsScreen({ route, navigation }) {
   const { pickup, dropoff, vehicleType, distanceKm, durationMin, weather, results = [] } = result;
   const weatherText = weatherLabel(weather);
 
-  const handleOpenApp = (providerResult) => openProvider(providerResult.provider.name, { pickup, destination: dropoff });
+  const handleOpenApp = (providerResult) => {
+    const providerId = providerResult?.provider?.name;
+    if (__DEV__) {
+      console.log("[ProviderLaunch] button handler", providerId, {
+        pickupValid: hasValidCoordinatePair(pickup),
+        destinationValid: hasValidCoordinatePair(dropoff),
+      });
+    }
+    return openProvider(providerId, { pickup, destination: dropoff });
+  };
   const handleAskAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
 
   return (
