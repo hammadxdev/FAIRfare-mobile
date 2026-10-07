@@ -17,4 +17,5 @@ test("native map preserves coordinate, marker, and route inputs", () => {
   assert.match(map, /coordinate=\{\{ latitude: pickup\.lat, longitude: pickup\.lng \}\}/);
   assert.match(map, /coordinate=\{\{ latitude: dropoff\.lat, longitude: dropoff\.lng \}\}/);
   assert.match(map, /routeCoordinates\.length > 1/);
+  assert.doesNotMatch(map, /: pickup && dropoff \?/);
 });

@@ -32,7 +32,7 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
         </View>
       )}
 
-      {hasRoute && <View style={styles.routeLine} />}
+      {hasRoute && routeInfo && <View style={styles.routeLine} />}
 
       {hasPickup && (
         <View style={[styles.markerWrap, styles.pickupPosition]}>

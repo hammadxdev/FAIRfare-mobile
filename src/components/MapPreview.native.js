@@ -77,16 +77,6 @@ export default function MapPreview({
         )}
         {routeCoordinates.length > 1 ? (
           <Polyline coordinates={routeCoordinates} strokeColor={colors.accent} strokeWidth={4} />
-        ) : pickup && dropoff ? (
-          <Polyline
-            coordinates={[
-              { latitude: pickup.lat, longitude: pickup.lng },
-              { latitude: dropoff.lat, longitude: dropoff.lng },
-            ]}
-            strokeColor={colors.accent}
-            strokeWidth={3}
-            lineDashPattern={[6, 6]}
-          />
         ) : null}
       </MapView>
 
