@@ -95,8 +95,6 @@ export default function ResultsScreen({ route, navigation }) {
       </TouchableOpacity>
 
       <Text style={styles.sectionTitle}>{results.length} providers compared</Text>
-      {results.some((item) => item.dataSource === "SIMULATED") && <Text style={styles.simulationNote}>Some fares are Fair Fare simulations for demo comparison and are not confirmed live provider prices.</Text>}
-
       {results.length > 0 && !results.some((item) => item.personalization?.isTopRecommendation) && (
         <Text style={styles.noPersonalizedMatch}>No available ride matches your current vehicle preferences.</Text>
       )}
@@ -200,12 +198,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     textTransform: "uppercase",
     letterSpacing: 0.5,
-  },
-  simulationNote: {
-    color: colors.muted,
-    fontSize: 11,
-    lineHeight: 16,
-    marginBottom: spacing.md,
   },
   disclaimer: {
     fontSize: 11,
