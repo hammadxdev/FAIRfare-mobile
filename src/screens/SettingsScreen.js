@@ -11,7 +11,7 @@ const VEHICLES = [
   ["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"],
   ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"],
 ];
-const PRIORITIES = [["CHEAPEST", "Cheapest fare"], ["FASTEST_PICKUP", "Faster pickup estimate (unverified)"], ["BALANCED", "Balanced"]];
+const PRIORITIES = [["CHEAPEST", "Cheapest fare"], ["FASTEST_PICKUP", "Faster simulated pickup estimate (unverified)"], ["BALANCED", "Balanced"]];
 
 function blankPreferences() { return { preferredVehicleType: null, avoidedVehicleTypes: [], typicalBudget: "", ridePriority: "BALANCED", currency: "PKR" }; }
 

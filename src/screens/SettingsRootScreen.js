@@ -12,7 +12,7 @@ import SettingsSkeleton from "../components/skeleton/SettingsSkeleton";
 import ErrorState from "../components/ErrorState";
 
 const VEHICLES = [["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"], ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"]];
-const PRIORITIES = { CHEAPEST: "Cheapest fare", FASTEST_PICKUP: "Faster pickup estimate (unverified)", BALANCED: "Balanced" };
+const PRIORITIES = { CHEAPEST: "Cheapest fare", FASTEST_PICKUP: "Faster simulated pickup estimate (unverified)", BALANCED: "Balanced" };
 const vehicleLabel = (value) => VEHICLES.find(([key]) => key === value)?.[1] || "No preference";
 const summary = (prefs, key) => {
   if (!prefs) return "Loading…";

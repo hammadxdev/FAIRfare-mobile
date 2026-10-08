@@ -8,7 +8,7 @@ import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 import ErrorState from "../components/ErrorState";
 
 const VEHICLES = [["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"], ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"]];
-const PRIORITIES = [["CHEAPEST", "CHEAPEST FARE", "Save money", "Prioritize lower fares"], ["FASTEST_PICKUP", "FASTEST PICKUP ESTIMATE (UNVERIFIED)", "Save time", "Prioritize a shorter simulated pickup estimate; live driver pickup times are not available"], ["BALANCED", "BALANCED", "Best balance", "Consider fare, simulated pickup estimate and preferences"]];
+const PRIORITIES = [["CHEAPEST", "CHEAPEST FARE", "Save money", "Prioritize lower fares"], ["FASTEST_PICKUP", "FASTEST SIMULATED PICKUP ESTIMATE (UNVERIFIED)", "Save time", "Prioritize a shorter simulated pickup estimate; live driver pickup times are not available"], ["BALANCED", "BALANCED", "Best balance", "Consider fare, simulated pickup estimate and preferences"]];
 const blank = { preferredVehicleType: null, avoidedVehicleTypes: [], typicalBudget: "", ridePriority: "BALANCED", currency: "PKR" };
 const labels = { preferred: ["Preferred vehicle", "Choose the ride type you usually prefer."], avoided: ["Avoid vehicle types", "Select ride types you generally don't want recommended."], budget: ["Typical budget", "Fair Fare can use your usual budget when personalizing ride recommendations."], priority: ["Ride priority", "What's most important when Fair Fare recommends a ride?"] };
 
