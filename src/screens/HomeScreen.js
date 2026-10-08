@@ -60,6 +60,8 @@ function toSuggestion(prediction) {
     placeId: prediction.placeId,
     name: prediction.mainText,
     address: prediction.secondaryText,
+    lat: prediction.lat,
+    lng: prediction.lng,
   };
 }
 
@@ -343,13 +345,12 @@ export default function HomeScreen({ navigation, route }) {
     dropoffSessionTokenRef.current = null;
   }
 
-  // Selecting a pickup/drop-off suggestion looks up place details with the
-  // same session token used for autocomplete, then resets it. Shared here
-  // since both fields do exactly this, just against different state.
+  // Geoapify autocomplete already returns canonical coordinates. Use them
+  // directly and retain the details endpoint only for legacy/incomplete
+  // suggestions that do not contain coordinates.
   function createSelectHandler({ sessionTokenRef, apply }) {
     return async (item) => {
-      if (!item.placeId) {
-        // Mock-fallback item already has lat/lng, no place-details call needed.
+      if (!item.placeId || (Number.isFinite(item.lat) && Number.isFinite(item.lng))) {
         apply(item);
         return;
       }
