@@ -22,6 +22,15 @@ test("consumer route travel duration remains visible", () => {
   assert.match(history, /durationSeconds/);
 });
 
+test("consumer pickup wording does not claim live driver timing", () => {
+  const ai = read("../screens/AIChatScreen.js");
+  const settings = read("../screens/PreferenceEditorScreen.js");
+  const support = read("../screens/SupportScreens.js");
+  assert.doesNotMatch(ai, /Which pickup is fastest/i);
+  assert.match(settings, /UNVERIFIED/);
+  assert.match(support, /does not currently have live driver pickup times/i);
+});
+
 test("provider fare values remain rendered", () => {
   assert.match(card, /formatPKR\(fare\)/);
   assert.match(card, /formatApproxPKR\(prediction\.predictedFare\)/);
