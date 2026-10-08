@@ -13,6 +13,7 @@ const BADGE_TYPE_MAP = {
 
 export default function ProviderFareCard({ result, onOpenApp }) {
   const { provider, fare, etaMin, badges = [], isRecommended, isAvailable = true, prediction, recommendation, personalization } = result;
+  const displayBadges = badges.filter((badge) => badge !== "Fastest");
   const recommendationLabel = { BOOK_NOW: "Book now", WAIT: "Wait", NEUTRAL: "Fair / neutral", INSUFFICIENT_DATA: "Insufficient data" }[recommendation?.status];
   const vehicleLabel = result.categoryName || result.vehicleType || result.quotes?.[0]?.categoryName;
 
@@ -28,7 +29,6 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         <View style={styles.headerCopy}>
           <Text style={styles.providerName}>{provider.displayName}</Text>
           {vehicleLabel ? <Text style={styles.vehicle}>{vehicleLabel}</Text> : null}
-          <Text style={styles.eta}>{isAvailable ? `${etaMin ?? "—"} min pickup` : "Temporarily unavailable"}</Text>
         </View>
         <View style={styles.fareBlock}>
           <Text style={styles.fareLabel}>Current fare</Text>
@@ -73,9 +73,9 @@ export default function ProviderFareCard({ result, onOpenApp }) {
         </View>
       )}
 
-      {badges.length > 0 && (
+      {displayBadges.length > 0 && (
         <View style={styles.badgeRow}>
-          {badges.map((badge) => (
+          {displayBadges.map((badge) => (
             <Badge key={badge} label={badge} type={BADGE_TYPE_MAP[badge] || "default"} />
           ))}
         </View>
@@ -135,11 +135,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   vehicle: {
-    fontSize: 12,
-    color: colors.muted,
-    marginTop: 2,
-  },
-  eta: {
     fontSize: 12,
     color: colors.muted,
     marginTop: 2,
