@@ -9,13 +9,14 @@ import { getLocationDisplayText } from "../utils/locationDisplay";
 // ignored since there's no map to tap on web.
 const GRID_LINE_POSITIONS = ["20%", "40%", "60%", "80%"];
 
-export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteLoading = false }) {
+export default function MapPreview({ pickup, dropoff, previewCoordinates = [], routeCoordinates = [], routeInfo = null, isRouteLoading = false, fullScreen = false }) {
   const hasPickup = Boolean(pickup);
   const hasDropoff = Boolean(dropoff);
-  const hasRoute = hasPickup && hasDropoff;
+  const hasRoute = Boolean(routeInfo?.geometryAvailable && routeCoordinates.length > 1);
+  const hasPreview = !hasRoute && previewCoordinates.length > 1;
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, fullScreen && styles.fullScreenWrapper]}>
       <View style={styles.gridBackground}>
         {GRID_LINE_POSITIONS.map((pos) => (
           <View key={`h-${pos}`} style={[styles.gridLineHorizontal, { top: pos }]} />
@@ -32,7 +33,7 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
         </View>
       )}
 
-      {hasRoute && routeInfo && <View style={styles.routeLine} />}
+      {(hasRoute || hasPreview) && <View style={[styles.routeLine, hasRoute ? styles.roadRouteLine : styles.previewRouteLine]} />}
 
       {hasPickup && (
         <View style={[styles.markerWrap, styles.pickupPosition]}>
@@ -56,18 +57,20 @@ export default function MapPreview({ pickup, dropoff, routeInfo = null, isRouteL
         <View style={styles.overlay}>
           <Text style={styles.overlayTitle}>Route preview</Text>
           <Text style={styles.overlaySubtitle} numberOfLines={1}>
-            {hasRoute
+            {hasPickup && hasDropoff
               ? `${getLocationDisplayText(pickup)} → ${getLocationDisplayText(dropoff)}`
               : hasPickup
               ? `Pickup: ${getLocationDisplayText(pickup)}`
               : `Drop-off: ${getLocationDisplayText(dropoff)}`}
           </Text>
           {isRouteLoading && <Text style={styles.overlaySubtitle}>Calculating route...</Text>}
-          {!isRouteLoading && routeInfo && (
+          {!isRouteLoading && routeInfo?.geometryAvailable && (
             <Text style={styles.overlayRoute}>
               {routeInfo.distanceKm} km • {routeInfo.durationMin} min
             </Text>
           )}
+          {!isRouteLoading && routeInfo?.isPreview && <Text style={styles.overlayRoute}>Straight-line preview - not a road route</Text>}
+          {!isRouteLoading && routeInfo?.roadRouteUnavailable && <Text style={styles.overlayRoute}>Road route unavailable</Text>}
         </View>
       )}
 
@@ -89,6 +92,14 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: "#EAF6EE",
     position: "relative",
+  },
+  fullScreenWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    height: undefined,
+    marginTop: 0,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   gridBackground: {
     ...StyleSheet.absoluteFillObject,
@@ -129,9 +140,11 @@ const styles = StyleSheet.create({
     left: "22%",
     right: "22%",
     borderTopWidth: 2,
-    borderTopColor: colors.primary,
+    borderTopColor: colors.muted,
     borderStyle: "dashed",
   },
+  previewRouteLine: { borderTopColor: colors.muted, borderStyle: "dashed" },
+  roadRouteLine: { borderTopColor: colors.accent, borderStyle: "solid", borderTopWidth: 4 },
   markerWrap: {
     position: "absolute",
     top: 78,

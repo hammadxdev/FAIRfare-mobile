@@ -9,5 +9,5 @@ test("AI unavailable responses clear loading and leave a retryable composer", ()
   assert.match(screen, /response\.data\.available === false/);
   assert.match(screen, /AI Assistant is temporarily unavailable\. Please try again\./);
   assert.match(screen, /finally \{ setLoading\(false\); \}/);
-  assert.match(screen, /askAi\(message, comparisonId, conversationId, clientMessageId\)/);
+  assert.match(screen, /askAi\(message, activeComparisonId, conversationId, clientMessageId\)/);
 });

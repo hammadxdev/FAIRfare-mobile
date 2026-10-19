@@ -47,7 +47,7 @@ export default function SettingsScreen() {
       <Text style={styles.fieldTitle}>Ride priority</Text>{PRIORITIES.map(([value, label]) => <TouchableOpacity key={value} style={styles.radioRow} onPress={() => setPreferences((current) => ({ ...current, ridePriority: value }))}><Text style={styles.radio}>{preferences.ridePriority === value ? "◉" : "○"}</Text><Text style={styles.radioLabel}>{label}</Text></TouchableOpacity>)}
       {error ? <Text style={styles.error}>{error}</Text> : null}<TouchableOpacity style={[styles.save, saving && styles.disabled]} onPress={save} disabled={saving}>{saving ? <ActivityIndicator color={colors.white} /> : <Text style={styles.saveText}>Save Preferences</Text>}</TouchableOpacity>
     </View>}
-    <Text style={styles.section}>APP</Text><View style={styles.card}><Text style={styles.value}>Fair Fare Version 1</Text></View><Text style={styles.section}>ACCOUNT ACTIONS</Text><TouchableOpacity style={styles.logout} onPress={logout}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
+    <Text style={styles.section}>APP</Text><View style={styles.card}><Text style={styles.value}>FairFare Version 1</Text></View><Text style={styles.section}>ACCOUNT ACTIONS</Text><TouchableOpacity style={styles.logout} onPress={logout}><Text style={styles.logoutText}>Logout</Text></TouchableOpacity>
   </ScrollView></View>;
 }
 

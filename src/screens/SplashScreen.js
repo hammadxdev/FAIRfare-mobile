@@ -46,7 +46,7 @@ export default function SplashScreen() {
         <View style={styles.logoRing}>
           <LogoMark size={100} />
         </View>
-        <Text style={styles.title}>Fair Fare</Text>
+        <Text style={styles.title}>FairFare</Text>
         <Text style={styles.tagline}>Ride Smarter</Text>
       </Animated.View>
     </View>

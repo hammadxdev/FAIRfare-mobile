@@ -16,7 +16,7 @@ export default function AIChatComposer({ value, onChangeText, onSend, loading, o
         {loading ? <ActivityIndicator color={colors.white} size="small" /> : <Text style={styles.sendIcon}>↑</Text>}
       </TouchableOpacity>
     </View>
-    <Text style={styles.hint}>Fair Fare AI uses your ride data to help you decide.</Text>
+    <Text style={styles.hint}>FairFare AI uses your ride data to help you decide.</Text>
   </View>;
 }
 

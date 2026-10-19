@@ -22,7 +22,12 @@ export default function SavedRoutesScreen({ navigation }) {
   const [items, setItems] = React.useState([]); const [loading, setLoading] = React.useState(true); const [error, setError] = React.useState(null); const [editing, setEditing] = React.useState(null); const [menuItem, setMenuItem] = React.useState(null); const [menuAnchor, setMenuAnchor] = React.useState(null);
   const load = React.useCallback(async () => { setLoading(true); try { setItems((await getSavedRoutes()).data || []); setError(null); } catch { setError("Couldn't load saved trips."); } finally { setLoading(false); } }, []);
   React.useEffect(() => { load(); }, [load]);
-  const compare = (item) => navigation.navigate("MainTabs", { screen: "Home", params: { savedRoute: item } });
+  const compare = (item) => {
+    const params = { screen: "Home", params: { savedRoute: item } };
+    const rootNavigation = navigation.getParent?.();
+    if (rootNavigation) rootNavigation.navigate("MainTabs", params);
+    else navigation.navigate("MainTabs", params);
+  };
   const remove = (item) => { setMenuItem(null); setMenuAnchor(null); Alert.alert(`Delete "${item.name}"?`, "This removes the saved shortcut only. Your comparison history will remain unchanged.", [{ text: "Cancel", style: "cancel" }, { text: "Delete", style: "destructive", onPress: async () => { try { await deleteSavedRoute(item.id); setItems((current) => current.filter((saved) => saved.id !== item.id)); } catch { Alert.alert("Unable to delete", "Please try again."); } } }]); };
   if (error && !items.length) return <View style={styles.flex}><AppHeader title="Saved Trips" subtitle="Quickly compare your regular routes" showLogo={false} /><ErrorState title="Saved trips unavailable" message={error} onRetry={load} /></View>;
   if (loading && !items.length) return <View style={styles.flex}><AppHeader title="Saved Trips" subtitle="Quickly compare your regular routes" showLogo={false} /><FlatList data={[]} contentContainerStyle={styles.content} ListHeaderComponent={<SavedRoutesSkeleton />} /></View>;

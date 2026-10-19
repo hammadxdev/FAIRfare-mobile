@@ -21,6 +21,7 @@ test("important inputs expose release-safe labels or readable placeholders", () 
 
 test("production compare errors cannot use the hardcoded fare fallback", () => {
   const home = read("HomeScreen.js");
-  assert.match(home, /allowDevMockFallback/);
-  assert.match(home, /ENABLE_MOCK_FALLBACK &&/);
+  assert.doesNotMatch(home, /allowDevMockFallback/);
+  assert.doesNotMatch(home, /ENABLE_MOCK_FALLBACK &&/);
+  assert.match(home, /Live prices are currently unavailable/);
 });

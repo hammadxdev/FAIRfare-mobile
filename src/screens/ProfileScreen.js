@@ -6,7 +6,7 @@ import SkeletonCard from "../components/skeleton/SkeletonCard";
 import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 
 function initials(name) {
-  const parts = String(name || "Fair Fare").trim().split(/\s+/).filter(Boolean);
+  const parts = String(name || "FairFare").trim().split(/\s+/).filter(Boolean);
   return (parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.[0] || "F").toUpperCase();
 }
 function errorMessage(error) {

@@ -15,11 +15,11 @@ const usesLocalHttpApi = apiBaseUrl?.startsWith("http://") === true;
 
 export default {
   expo: {
-    name: "Fair Fare",
+    name: "FairFare",
     slug: "fairfair",
     version: "1.0.0",
     orientation: "portrait",
-    // Use the official Fair Fare mark instead of the Expo starter artwork.
+    // Use the official FairFare mark instead of the Expo starter artwork.
     icon: "./assets/logo/logo.png",
     userInterfaceStyle: "light",
     splash: {
@@ -67,6 +67,7 @@ export default {
           androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
         },
       ],
+      "expo-status-bar",
       "./plugins/withProviderQueries",
     ],
 

@@ -1,5 +1,6 @@
 import axios from "axios";
 import { createRefreshSingleFlight, isRefreshAuthFailure } from "./authRetry.cjs";
+import { annotateApiError, isRetryableRequest, retryAfterMs } from "./apiErrors.cjs";
 
 // This is the only mobile API base URL. Expo inlines EXPO_PUBLIC_* variables
 // at bundle time; restart Expo after changing the value.
@@ -7,7 +8,7 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 
 if (!API_BASE_URL) {
   throw new Error(
-    "[Fair Fare] EXPO_PUBLIC_API_BASE_URL is missing. Set it in mobile/.env " +
+    "[FairFare] EXPO_PUBLIC_API_BASE_URL is missing. Set it in mobile/.env " +
       "to the backend URL, including /api (for example http://10.0.2.2:4000/api).",
   );
 }
@@ -16,13 +17,20 @@ const isDevelopment =
   typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
 
 if (isDevelopment) {
-  console.info(`Fair Fare API: ${API_BASE_URL}`);
+  console.info(`FairFare API: ${API_BASE_URL}`);
 }
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
   headers: { "Content-Type": "application/json" },
+});
+
+const RETRY_LIMIT = 2;
+const retryWait = (ms, signal) => new Promise((resolve, reject) => {
+  if (signal?.aborted) { reject(Object.assign(new Error("Request cancelled"), { code: "ERR_CANCELED" })); return; }
+  const timer = setTimeout(resolve, ms);
+  signal?.addEventListener("abort", () => { clearTimeout(timer); reject(Object.assign(new Error("Request cancelled"), { code: "ERR_CANCELED" })); }, { once: true });
 });
 
 let authHandlers = { getSession: null, refresh: null, signOut: null };
@@ -38,19 +46,28 @@ apiClient.interceptors.request.use(async (config) => {
 });
 apiClient.interceptors.response.use((response) => response, async (error) => {
   const config = error.config;
-  if (error.response?.status !== 401 || config?._authRetried || config?.skipAuth || authSigningOut || !authHandlers.refresh || config?.url?.includes("/auth/refresh")) throw error;
-  config._authRetried = true;
-  try { const session = await refreshOnce(); config.headers.Authorization = `Bearer ${session.accessToken}`; return apiClient(config); }
-  catch (refreshError) {
-    const isSessionExpired = isRefreshAuthFailure(refreshError);
-    if (isSessionExpired && !sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
-    const sessionError = new Error(isSessionExpired ? "Your session has expired. Please sign in again." : "We could not refresh your session because the server is temporarily unavailable. Please try again.");
-    sessionError.code = isSessionExpired ? "SESSION_EXPIRED" : "SESSION_REFRESH_UNAVAILABLE";
-    sessionError.sessionError = true;
-    sessionError.retryable = !isSessionExpired;
-    sessionError.cause = refreshError;
-    throw sessionError;
+  if (error.response?.status === 401 && !config?._authRetried && !config?.skipAuth && !authSigningOut && authHandlers.refresh && !config?.url?.includes("/auth/refresh")) {
+    config._authRetried = true;
+    try { const session = await refreshOnce(); config.headers.Authorization = `Bearer ${session.accessToken}`; return apiClient(config); }
+    catch (refreshError) {
+      const isSessionExpired = isRefreshAuthFailure(refreshError);
+      if (isSessionExpired && !sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
+      const sessionError = new Error(isSessionExpired ? "Your session has expired. Please sign in again." : "We could not refresh your session because the server is temporarily unavailable. Please try again.");
+      sessionError.code = isSessionExpired ? "SESSION_EXPIRED" : "SESSION_REFRESH_UNAVAILABLE";
+      sessionError.sessionError = true;
+      sessionError.retryable = !isSessionExpired;
+      sessionError.cause = refreshError;
+      throw annotateApiError(sessionError);
+    }
   }
+  const details = annotateApiError(error);
+  const retryCount = Number(config?._fareRetryCount || 0);
+  if (config && details.retryable && isRetryableRequest(config) && retryCount < RETRY_LIMIT && error.code !== "ERR_CANCELED") {
+    config._fareRetryCount = retryCount + 1;
+    await retryWait(retryAfterMs(error, 250 * 2 ** retryCount), config.signal);
+    return apiClient(config);
+  }
+  throw details;
 });
 
 function authData(response) { return response.data.data; }
@@ -119,12 +136,12 @@ export async function predictFare(payload) {
 }
 export async function listAiConversations() { const response = await apiClient.get("/ai/conversations"); return response.data; }
 export async function createAiConversation() { const response = await apiClient.post("/ai/conversations"); return response.data; }
-export async function getAiConversation(id) { const response = await apiClient.get(`/ai/conversations/${id}`); return response.data; }
+export async function getAiConversation(id, config) { const response = await apiClient.get(`/ai/conversations/${id}`, config); return response.data; }
 export async function renameAiConversation(id, title) { const response = await apiClient.patch(`/ai/conversations/${id}`, { title }); return response.data; }
 export async function updateAiConversation(id, changes) { const response = await apiClient.patch(`/ai/conversations/${id}`, changes); return response.data; }
 export async function deleteAiConversation(id) { const response = await apiClient.delete(`/ai/conversations/${id}`); return response.data; }
-export async function askAi(message, comparisonId, conversationId, clientMessageId) {
-  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}), ...(clientMessageId ? { clientMessageId } : {}) });
+export async function askAi(message, comparisonId, conversationId, clientMessageId, config) {
+  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}), ...(clientMessageId ? { clientMessageId } : {}) }, config);
   return response.data;
 }
 

@@ -34,6 +34,10 @@ function buildYangoRouteUrl(tripContext = {}) {
   const params = new URLSearchParams({
     "start-lat": String(startLat), "start-lon": String(startLon),
     "end-lat": String(endLat), "end-lon": String(endLon),
+    ref: "fairfare",
+    adj_t: "vokme8e_nd9s9z9",
+    lang: "en",
+    adj_deeplink_js: "1",
   });
   return `https://yango.go.link/route?${params.toString()}`;
 }
@@ -58,8 +62,8 @@ function getIndriveLaunchUris(tripContext = {}) {
 
 function getProviderLaunchUris(providerId, tripContext = {}) {
   if (providerId === "indrive") return getIndriveLaunchUris(tripContext);
-  if (providerId === "quickride") return getYangoLaunchUris(tripContext);
-  if (providerId === "urbancab") return getBykeaLaunchUris();
+  if (providerId === "quickride" || providerId === "yango") return getYangoLaunchUris(tripContext);
+  if (providerId === "urbancab" || providerId === "bykea") return getBykeaLaunchUris();
   return [];
 }
 

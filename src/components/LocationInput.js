@@ -8,7 +8,7 @@ import colors, { radius, spacing } from "../constants/colors";
 // forwards a ref to its input box so the parent can measure its on-screen
 // position to anchor that overlay, and reports focus/blur upward.
 const LocationInput = forwardRef(function LocationInput(
-  { label, placeholder, value, onChangeText, onFocus, onBlur, loading = false, dotColor = null },
+  { label, placeholder, value, secondaryValue = "", onChangeText, onFocus, onBlur, loading = false, dotColor = null, trailing = null },
   ref
 ) {
   return (
@@ -21,12 +21,16 @@ const LocationInput = forwardRef(function LocationInput(
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           value={value}
+          accessibilityLabel={label}
+          accessibilityHint={label === "Pickup" ? "Enter or search for a pickup location" : "Enter or search for a drop-off location"}
           onChangeText={onChangeText}
           onFocus={onFocus}
           onBlur={onBlur}
         />
+        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
         {loading && <ActivityIndicator size="small" color={colors.accent} style={styles.spinner} />}
       </View>
+      {secondaryValue ? <Text style={styles.secondary} numberOfLines={2}>{secondaryValue}</Text> : null}
     </View>
   );
 });
@@ -52,7 +56,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingRight: spacing.xl,
+    paddingRight: 52,
     paddingVertical: 14,
     fontSize: 15,
     color: colors.primary,
@@ -71,5 +75,18 @@ const styles = StyleSheet.create({
   spinner: {
     position: "absolute",
     right: spacing.md,
+  },
+  trailing: {
+    position: "absolute",
+    right: 2,
+    height: "100%",
+    justifyContent: "center",
+  },
+  secondary: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
   },
 });

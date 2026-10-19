@@ -1,37 +1,47 @@
-import React, { useMemo, useRef, useEffect } from "react";
+import React, { useMemo, useRef, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
 import MapView, { Marker, Polyline } from "react-native-maps";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import { getRegionForPoints } from "../utils/mapRegion";
 import { getLocationDisplayText } from "../utils/locationDisplay";
+import { isValidLocation } from "../utils/routeGeometry.cjs";
 
-const SELECTING_MODES = ["pickup", "dropoff"];
+const SELECTING_MODES = ["pickup", "destination"];
 
 export default function MapPreview({
   pickup,
   dropoff,
   routeCoordinates = [],
+  previewCoordinates = [],
   routeInfo = null,
   selectingMode = "pickup",
   onSelectingModeChange,
   onMapPress,
+  onAdjustPickup,
+  onAdjustLocation,
   isRouteLoading = false,
+  fullScreen = false,
 }) {
   const mapRef = useRef(null);
+  const [layoutReady, setLayoutReady] = useState(false);
   const region = useMemo(() => getRegionForPoints(pickup, dropoff), [pickup, dropoff]);
+  const validPickup = useMemo(() => isValidLocation(pickup) ? { lat: Number(pickup.lat ?? pickup.latitude), lng: Number(pickup.lng ?? pickup.longitude) } : null, [pickup]);
+  const validDropoff = useMemo(() => isValidLocation(dropoff) ? { lat: Number(dropoff.lat ?? dropoff.latitude), lng: Number(dropoff.lng ?? dropoff.longitude) } : null, [dropoff]);
+  const validRouteCoordinates = useMemo(() => routeCoordinates.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)), [routeCoordinates]);
+  const validPreviewCoordinates = useMemo(() => previewCoordinates.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)), [previewCoordinates]);
 
   useEffect(() => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !layoutReady) return;
 
     // Prefer fitting to the real route shape; fall back to just the two
     // markers (or the default region) when there's no route yet.
     const coordsToFit =
-      routeCoordinates.length > 1
-        ? routeCoordinates
-        : pickup && dropoff
+      validRouteCoordinates.length > 1
+        ? validRouteCoordinates
+        : validPickup && validDropoff
         ? [
-            { latitude: pickup.lat, longitude: pickup.lng },
-            { latitude: dropoff.lat, longitude: dropoff.lng },
+            { latitude: validPickup.lat, longitude: validPickup.lng },
+            { latitude: validDropoff.lat, longitude: validDropoff.lng },
           ]
         : null;
 
@@ -43,7 +53,7 @@ export default function MapPreview({
     } else {
       mapRef.current.animateToRegion(region, 450);
     }
-  }, [region, routeCoordinates, pickup, dropoff]);
+  }, [layoutReady, region, validRouteCoordinates, validPickup, validDropoff]);
 
   const handlePress = (event) => {
     if (!onMapPress) return;
@@ -52,31 +62,34 @@ export default function MapPreview({
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View style={[styles.wrapper, fullScreen && styles.fullScreenWrapper]}>
       <MapView
         ref={mapRef}
         style={styles.map}
         initialRegion={region}
+        onLayout={() => setLayoutReady(true)}
         onPress={handlePress}
       >
-        {pickup && (
+        {validPickup && (
           <Marker
-            coordinate={{ latitude: pickup.lat, longitude: pickup.lng }}
+            coordinate={{ latitude: validPickup.lat, longitude: validPickup.lng }}
             pinColor={colors.accent}
             title="Pickup"
             description={getLocationDisplayText(pickup)}
           />
         )}
-        {dropoff && (
+        {validDropoff && (
           <Marker
-            coordinate={{ latitude: dropoff.lat, longitude: dropoff.lng }}
+            coordinate={{ latitude: validDropoff.lat, longitude: validDropoff.lng }}
             pinColor={colors.navy}
             title="Drop-off"
             description={getLocationDisplayText(dropoff)}
           />
         )}
-        {routeCoordinates.length > 1 ? (
-          <Polyline coordinates={routeCoordinates} strokeColor={colors.accent} strokeWidth={4} />
+        {routeCoordinates.length > 1 && validRouteCoordinates.length > 1 ? (
+          <Polyline coordinates={validRouteCoordinates} strokeColor={colors.accent} strokeWidth={4} />
+        ) : validPreviewCoordinates.length > 1 ? (
+          <Polyline coordinates={validPreviewCoordinates} strokeColor={colors.muted} strokeWidth={3} lineDashPattern={[8, 8]} />
         ) : null}
       </MapView>
 
@@ -103,19 +116,36 @@ export default function MapPreview({
         </View>
       )}
 
+      {((selectingMode === "pickup" && pickup) || (selectingMode === "destination" && dropoff)) && (onAdjustLocation || onAdjustPickup) && (
+        <TouchableOpacity
+          style={styles.adjustButton}
+          onPress={() => onAdjustLocation ? onAdjustLocation(selectingMode) : onAdjustPickup()}
+          activeOpacity={0.85}
+          accessibilityLabel={`Adjust ${selectingMode} on map`}
+        >
+          <Text style={styles.adjustButtonText}>Adjust {selectingMode} on map</Text>
+        </TouchableOpacity>
+      )}
+
       {isRouteLoading && (
         <View style={styles.loadingPill}>
           <ActivityIndicator size="small" color={colors.white} />
-          <Text style={styles.loadingText}>Calculating route...</Text>
+          <Text style={styles.loadingText}>Straight-line preview • calculating road route…</Text>
         </View>
       )}
 
-      {!isRouteLoading && routeInfo && (
+      {!isRouteLoading && routeInfo?.geometryAvailable && (
         <View style={styles.routePill}>
           <Text style={styles.routePillText}>
             {routeInfo.distanceKm} km • {routeInfo.durationMin} min
           </Text>
         </View>
+      )}
+      {!isRouteLoading && routeInfo?.isPreview && (
+        <View style={styles.previewPill}><Text style={styles.previewPillText}>Straight-line preview — not a road route</Text></View>
+      )}
+      {!isRouteLoading && routeInfo && !routeInfo.geometryAvailable && (
+        <View style={styles.routePill}><Text style={styles.routePillText}>Road route unavailable</Text></View>
       )}
     </View>
   );
@@ -130,6 +160,14 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  fullScreenWrapper: {
+    ...StyleSheet.absoluteFillObject,
+    height: undefined,
+    marginTop: 0,
+    marginHorizontal: 0,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   map: {
     flex: 1,
@@ -192,6 +230,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "700",
   },
+  previewPill: { position: "absolute", bottom: spacing.sm, alignSelf: "center", backgroundColor: "rgba(17, 24, 39, 0.88)", borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 8 },
+  previewPillText: { color: colors.white, fontSize: 12, fontWeight: "700" },
   emptyStatePill: {
     position: "absolute",
     bottom: spacing.sm,
@@ -209,4 +249,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  adjustButton: { position: "absolute", top: 54, right: spacing.sm, backgroundColor: colors.card, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 9, elevation: 4 },
+  adjustButtonText: { color: colors.primary, fontSize: 12, fontWeight: "800" },
 });

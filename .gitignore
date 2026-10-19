@@ -48,3 +48,13 @@ coverage/
 # android/.gradle/, android/app/build/, android/build/ patterns instead.
 /ios
 /android
+
+# Local build and inspection artifacts
+*.apk
+*.aab
+/apk-inspect/
+/build/
+/outputs/
+/expo-config-check.json
+/.expo-config-check.json
+/.expo-test/

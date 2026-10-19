@@ -41,3 +41,46 @@ test("provider fare values remain rendered", () => {
   assert.match(card, /formatPKR\(fare\)/);
   assert.match(card, /formatApproxPKR\(prediction\.predictedFare\)/);
 });
+
+test("provider cards distinguish suggested fares from exact live fares", () => {
+  assert.match(card, /SUGGESTED PKR/);
+  assert.match(card, /hasSuggestedFare/);
+});
+
+test("Yango cards keep exact, display, starting, ETA, and availability semantics separate", () => {
+  assert.match(card, /displayFare/);
+  assert.match(card, /startingFare/);
+  assert.match(card, /pickupEtaSeconds/);
+  assert.match(card, /isYango/);
+  assert.match(card, /isIndrive/);
+  assert.match(card, /hasLiveFare && isIndrive/);
+});
+
+test("results keep the trip summary vehicle-free and render provider sections", () => {
+  assert.doesNotMatch(results, /metaLabel\}>Vehicle/);
+  assert.doesNotMatch(results, /vehicleType/);
+  assert.match(results, /summaryEyebrow}>TRIP SUMMARY/);
+  assert.match(results, /liveInDriveResults\.map/);
+  assert.match(results, /Bykea — Live fares unavailable/);
+  assert.match(results, /distanceKm/);
+  assert.match(results, /durationMin/);
+});
+
+test("ResultsScreen uses one provider action below category rows", () => {
+  assert.match(results, /Open inDrive/);
+  assert.match(results, /Open Yango/);
+  assert.equal((results.match(/Open inDrive/g) || []).length, 1);
+  assert.equal((results.match(/Open Yango/g) || []).length, 1);
+  assert.doesNotMatch(results, /onOpenApp=\{handleOpenApp\}/);
+  assert.match(results, /<Text style=\{styles\.sectionTitle\}>inDrive/);
+  assert.match(results, /<Text style=\{styles\.sectionTitle\}>Yango/);
+  assert.match(results, /Bykea — Live fares unavailable/);
+  assert.doesNotMatch(results, /<ScrollView/);
+});
+
+test("fare rows support compact rendering without individual provider actions", () => {
+  assert.match(card, /compact = false/);
+  assert.match(card, /compact && styles.cardCompact/);
+  assert.match(card, /compactFareRow/);
+  assert.match(card, /Boolean\(onOpenApp\)/);
+});

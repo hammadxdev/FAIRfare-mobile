@@ -92,7 +92,20 @@ test("open fallback failure reaches the verified HTTPS app link", async () => {
 });
 
 test("builds the documented Yango route link with encoded coordinates", () => {
-  assert.equal(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }), "https://yango.go.link/route?start-lat=31.5&start-lon=74.3&end-lat=31.6&end-lon=74.4");
+  assert.equal(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }), "https://yango.go.link/route?start-lat=31.5&start-lon=74.3&end-lat=31.6&end-lon=74.4&ref=fairfare&adj_t=vokme8e_nd9s9z9&lang=en&adj_deeplink_js=1");
+});
+
+test("preserves the comparison pickup and destination ordering without rounding", () => {
+  const url = buildYangoRouteUrl({
+    pickup: { lat: "12.3456789", lng: "45.6789012" },
+    destination: { lat: "13.4567890", lng: "46.7890123" },
+  });
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("start-lat"), "12.3456789");
+  assert.equal(parsed.searchParams.get("start-lon"), "45.6789012");
+  assert.equal(parsed.searchParams.get("end-lat"), "13.456789");
+  assert.equal(parsed.searchParams.get("end-lon"), "46.7890123");
+  assert.notEqual(parsed.searchParams.get("start-lat"), parsed.searchParams.get("end-lat"));
 });
 
 test("rejects invalid Yango coordinates and falls back to the official site", () => {
@@ -102,6 +115,8 @@ test("rejects invalid Yango coordinates and falls back to the official site", ()
 
 test("Bykea exposes the verified official app-link URL without route claims", () => {
   assert.deepEqual(getBykeaLaunchUris(), ["bykea://kl", "https://www.bykea.com/pk/"]);
+  assert.deepEqual(getProviderLaunchUris("bykea"), getBykeaLaunchUris());
+  assert.deepEqual(getProviderLaunchUris("urbancab"), getBykeaLaunchUris());
 });
 
 test("attempts openURL even when canOpenURL is false", async () => {

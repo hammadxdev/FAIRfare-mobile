@@ -14,8 +14,10 @@ test("native map config uses the react-native-maps Android key plugin", () => {
 
 test("native map preserves coordinate, marker, and route inputs", () => {
   assert.match(map, /initialRegion=\{region\}/);
-  assert.match(map, /coordinate=\{\{ latitude: pickup\.lat, longitude: pickup\.lng \}\}/);
-  assert.match(map, /coordinate=\{\{ latitude: dropoff\.lat, longitude: dropoff\.lng \}\}/);
+  assert.match(map, /coordinate=\{\{ latitude: validPickup\.lat, longitude: validPickup\.lng \}\}/);
+  assert.match(map, /coordinate=\{\{ latitude: validDropoff\.lat, longitude: validDropoff\.lng \}\}/);
   assert.match(map, /routeCoordinates\.length > 1/);
-  assert.doesNotMatch(map, /: pickup && dropoff \?/);
+  assert.match(map, /onLayout=\{\(\) => setLayoutReady\(true\)\}/);
+  assert.match(map, /fitToCoordinates\(coordsToFit/);
+  assert.doesNotMatch(map, /coordinate=\{\{ latitude: pickup\.lat/);
 });

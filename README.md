@@ -1,15 +1,24 @@
 # FairFare Mobile
 
 React Native (Expo) frontend for **FairFare** — compare ride fares across
-simulated providers. Tagline: _Compare fares. Choose fair._
+provider adapters and deterministic fallbacks. Tagline: _Compare fares. Choose
+fair._
 
 This app is a UI client for the backend at `D:\ride\backend`
 (`GET /api/health`, `GET /api/providers`, `POST /api/fares/compare`). Login,
 registration, persistent SecureStore sessions, user-owned history and Saved
 Trips, private
 preferences, deterministic Book/Wait fare recommendations, personalization,
-and the grounded AI Ride Assistant are implemented. Real ride-provider APIs
-remain out of scope for this FYP milestone.
+and the grounded AI Ride Assistant are implemented. Provider live behavior is
+backend-gated: the saved Supabase runtime rows are inactive, the existing
+environment configuration remains authoritative, and no provider credentials
+are exposed to this app.
+
+inDrive keeps suggested/negotiable fare semantics. Yango preserves
+exact/display/unavailable quote semantics. Bykea live pricing is not currently
+configured. Provider buttons only open the provider handoff and never place a
+ride or payment; route autofill is not reported as supported unless separately
+verified.
 
 ## Tech Stack
 
@@ -213,6 +222,10 @@ all grounding data and keeps the LLM key server-side; when AI is disabled or
 unconfigured, the app shows an unavailable-assistant message without
 breaking comparison, history, or settings.
 
+The backend rejects stale comparison grounding when the conversation changes
+pickup or destination. The mobile client sends the current comparison context;
+it does not calculate or invent fares locally.
+
 ## Logo & Vehicle Images
 
 - `assets/logo/logo.png` and `assets/vehicles/*.png` currently contain small
@@ -266,6 +279,12 @@ throws an `react-native-maps` import error
 
 - Provider handoff currently opens the configured inDrive web link and shows
   a clear manual-open message for providers without verified links.
+- Supabase migrations `010_provider_api_payloads.sql` and
+  `011_provider_runtime_config.sql` are backend-only. Payload diagnostics are
+  sanitized and short-lived; runtime configuration rows contain no credentials
+  and remain inactive until an operator completes authorization and cutover.
+- GitHub preserves client source, tests, and migrations; Supabase data requires
+  its own backup and is never bundled into the mobile app.
 - Android maps: `react-native-maps` on Android uses Google Maps and needs
   an API key (`app.json` → `android.config.googleMaps.apiKey`) for a
   polished look; without one it still renders (grey/dev watermark) and

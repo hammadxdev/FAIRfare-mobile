@@ -17,7 +17,7 @@ export default function AIChatHeader({ onOpenDrawer, onNewChat, contextLabel }) 
       <IconButton label="Open conversations" icon="≡" onPress={onOpenDrawer} testID="open-conversations" />
       <View style={styles.heading}>
         <Text style={styles.title} numberOfLines={1}>AI Ride Assistant</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>Grounded in your Fair Fare data</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>Grounded in your FairFare data</Text>
       </View>
       <IconButton label="New chat" icon="＋" onPress={onNewChat} testID="new-chat" />
     </View>

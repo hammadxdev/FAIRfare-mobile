@@ -21,10 +21,10 @@ const Stack = createNativeStackNavigator();
 export default function RootNavigator() {
   const { isLoading, isAuthenticated, sessionNotice, dismissSessionNotice } = useAuth();
   useEffect(() => {
-    console.info(`[AUTH] loading=${isLoading}`);
+    if (__DEV__) console.info(`[AUTH] loading=${isLoading}`);
   }, [isLoading]);
   useEffect(() => {
-    console.info(`[AUTH] authenticated=${isAuthenticated}`);
+    if (__DEV__) console.info(`[AUTH] authenticated=${isAuthenticated}`);
   }, [isAuthenticated]);
   if (isLoading) return <SplashScreen />;
   return (<>
@@ -51,7 +51,7 @@ export default function RootNavigator() {
       <Stack.Screen name="SavedRoutes" component={SavedRoutesScreen} options={{ headerShown: true, title: "Saved Trips", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: true, title: "Profile", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="PreferenceEditor" component={PreferenceEditorScreen} options={({ route }) => ({ headerShown: true, title: route.params?.mode === "preferred" ? "Preferred vehicle" : route.params?.mode === "avoided" ? "Avoid vehicle types" : route.params?.mode === "budget" ? "Typical budget" : "Ride priority", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary })} />
-      <Stack.Screen name="AboutFairFare" component={AboutScreen} options={{ headerShown: true, title: "About Fair Fare", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
+      <Stack.Screen name="AboutFairFare" component={AboutScreen} options={{ headerShown: true, title: "About FairFare", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Terms" component={TermsScreen} options={{ headerShown: true, title: "Terms & Conditions", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ headerShown: true, title: "Privacy Policy", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />
       <Stack.Screen name="HelpSupport" component={HelpScreen} options={{ headerShown: true, title: "Help & Support", headerStyle: { backgroundColor: colors.card }, headerTintColor: colors.primary }} />

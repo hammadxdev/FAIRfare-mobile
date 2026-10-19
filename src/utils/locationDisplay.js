@@ -11,3 +11,8 @@ export function getLocationDisplayText(location) {
     ""
   );
 }
+
+export function getLocationSecondaryText(location) {
+  if (!location) return "";
+  return location.secondaryAddress || (location.address && location.address !== getLocationDisplayText(location) ? location.address : "");
+}
