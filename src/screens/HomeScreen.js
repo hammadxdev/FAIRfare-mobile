@@ -735,7 +735,15 @@ export default function HomeScreen({ navigation, route }) {
           message: err?.response?.data?.message || err?.message || "unknown route error",
         });
         setRouteCoordinates([]);
-        setRouteInfo({ requestId, isPreview: true, geometryAvailable: false, roadRouteUnavailable: true, compareFaresEligible: false });
+        const providerMessage = String(err?.response?.data?.message || "");
+        const routeFailureKind = err?.code === "ECONNABORTED" || err?.code === "ETIMEDOUT" || err?.response?.status === 408 || err?.response?.status === 504
+          ? "timeout"
+          : err?.routeDiagnostics || /invalid road geometry|invalid road duration/i.test(providerMessage)
+            ? "malformed_geometry"
+            : err?.response?.status === 404
+              ? "no_route"
+              : "unavailable";
+        setRouteInfo({ requestId, isPreview: true, geometryAvailable: false, roadRouteUnavailable: true, routeFailureKind, compareFaresEligible: false });
         if (IS_DEVELOPMENT) {
           console.info("[maps] route state committed", {
             requestId,

@@ -1,6 +1,6 @@
 import React, { useMemo, useRef, useEffect, useState } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet } from "react-native";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, UrlTile } from "react-native-maps";
 import colors, { radius, shadow, spacing } from "../constants/colors";
 import { getRegionForPoints } from "../utils/mapRegion";
 import { getLocationDisplayText } from "../utils/locationDisplay";
@@ -24,11 +24,20 @@ export default function MapPreview({
 }) {
   const mapRef = useRef(null);
   const [layoutReady, setLayoutReady] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const [mapLoadTimedOut, setMapLoadTimedOut] = useState(false);
   const region = useMemo(() => getRegionForPoints(pickup, dropoff), [pickup, dropoff]);
   const validPickup = useMemo(() => isValidLocation(pickup) ? { lat: Number(pickup.lat ?? pickup.latitude), lng: Number(pickup.lng ?? pickup.longitude) } : null, [pickup]);
   const validDropoff = useMemo(() => isValidLocation(dropoff) ? { lat: Number(dropoff.lat ?? dropoff.latitude), lng: Number(dropoff.lng ?? dropoff.longitude) } : null, [dropoff]);
   const validRouteCoordinates = useMemo(() => routeCoordinates.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)), [routeCoordinates]);
   const validPreviewCoordinates = useMemo(() => previewCoordinates.filter((point) => Number.isFinite(point?.latitude) && Number.isFinite(point?.longitude)), [previewCoordinates]);
+
+  useEffect(() => {
+    setMapReady(false);
+    setMapLoadTimedOut(false);
+    const timer = setTimeout(() => setMapLoadTimedOut(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (!mapRef.current || !layoutReady) return;
@@ -66,10 +75,18 @@ export default function MapPreview({
       <MapView
         ref={mapRef}
         style={styles.map}
+        mapType="none"
         initialRegion={region}
         onLayout={() => setLayoutReady(true)}
+        onMapReady={() => { setMapReady(true); setMapLoadTimedOut(false); }}
+        onMapLoaded={() => { setMapReady(true); setMapLoadTimedOut(false); }}
         onPress={handlePress}
       >
+        <UrlTile
+          urlTemplate="https://a.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png"
+          maximumZ={19}
+          flipY={false}
+        />
         {validPickup && (
           <Marker
             coordinate={{ latitude: validPickup.lat, longitude: validPickup.lng }}
@@ -92,6 +109,14 @@ export default function MapPreview({
           <Polyline coordinates={validPreviewCoordinates} strokeColor={colors.muted} strokeWidth={3} lineDashPattern={[8, 8]} />
         ) : null}
       </MapView>
+
+      {mapLoadTimedOut && !mapReady && (
+        <View pointerEvents="none" style={styles.mapErrorPill}>
+          <Text style={styles.mapErrorText}>Map tiles are taking too long to load. Check your connection.</Text>
+        </View>
+      )}
+
+      <Text style={styles.attribution}>© OpenStreetMap contributors © CARTO</Text>
 
       {!pickup && !dropoff && (
         <View style={styles.emptyStatePill}>
@@ -145,7 +170,9 @@ export default function MapPreview({
         <View style={styles.previewPill}><Text style={styles.previewPillText}>Straight-line preview — not a road route</Text></View>
       )}
       {!isRouteLoading && routeInfo && !routeInfo.geometryAvailable && (
-        <View style={styles.routePill}><Text style={styles.routePillText}>Road route unavailable</Text></View>
+        <View style={styles.routePill}><Text style={styles.routePillText}>
+          {routeInfo.routeFailureKind === "timeout" ? "Route request timed out" : routeInfo.routeFailureKind === "malformed_geometry" ? "Route geometry was invalid" : routeInfo.routeFailureKind === "no_route" ? "No road route found" : "Road route unavailable"}
+        </Text></View>
       )}
     </View>
   );
@@ -171,6 +198,18 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+    width: "100%",
+    height: "100%",
+  },
+  attribution: {
+    position: "absolute",
+    right: 4,
+    bottom: 2,
+    backgroundColor: "rgba(255, 255, 255, 0.78)",
+    color: "#334155",
+    fontSize: 9,
+    paddingHorizontal: 3,
+    paddingVertical: 1,
   },
   modeToggle: {
     position: "absolute",
@@ -249,6 +288,8 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     textAlign: "center",
   },
+  mapErrorPill: { position: "absolute", top: spacing.xl, left: spacing.lg, right: spacing.lg, alignItems: "center", backgroundColor: "rgba(17, 24, 39, 0.88)", borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  mapErrorText: { color: colors.white, fontSize: 12, fontWeight: "600", textAlign: "center" },
   adjustButton: { position: "absolute", top: 54, right: spacing.sm, backgroundColor: colors.card, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 9, elevation: 4 },
   adjustButtonText: { color: colors.primary, fontSize: 12, fontWeight: "800" },
 });
