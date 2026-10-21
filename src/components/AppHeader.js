@@ -5,17 +5,18 @@ import LogoMark from "./LogoMark";
 import colors, { spacing } from "../constants/colors";
 
 export default function AppHeader({
-  title = "FairFare",
+  title = "FareRide",
   subtitle = "Compare fares. Choose fair.",
   showLogo = true,
+  compact = false,
 }) {
   const insets = useSafeAreaInsets();
   return (
-    <View style={[styles.container, { paddingTop: spacing.lg + insets.top }]}>
-      {showLogo && <LogoMark size={42} style={styles.logo} />}
+    <View style={[styles.container, compact && styles.compactContainer, { paddingTop: (compact ? spacing.sm : spacing.lg) + insets.top }]}>
+      {showLogo && <LogoMark size={compact ? 34 : 42} style={[styles.logo, compact && styles.compactLogo]} />}
       <View>
-        <Text style={styles.title}>{title}</Text>
-        {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
+        <Text style={[styles.title, compact && styles.compactTitle]}>{title}</Text>
+        {subtitle ? <Text style={[styles.subtitle, compact && styles.compactSubtitle]}>{subtitle}</Text> : null}
       </View>
     </View>
   );
@@ -41,5 +42,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.muted,
     marginTop: 2,
+  },
+  compactContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  compactLogo: {
+    marginRight: spacing.sm,
+  },
+  compactTitle: {
+    fontSize: 18,
+  },
+  compactSubtitle: {
+    fontSize: 11,
   },
 });

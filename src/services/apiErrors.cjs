@@ -4,12 +4,19 @@ function isTimeoutError(error) {
   return error?.code === "ECONNABORTED" || error?.code === "ETIMEDOUT" || /timeout/i.test(String(error?.message || ""));
 }
 
+function isCanceledError(error) {
+  return error?.code === "ERR_CANCELED" || error?.name === "CanceledError" || /cancell?ed/i.test(String(error?.message || ""));
+}
+
 function classifyApiError(error) {
   const status = Number(error?.response?.status || 0) || null;
   let kind = "unknown";
   let userMessage = "Something went wrong. Please try again.";
 
-  if (status === 401 || status === 403 || error?.code === "SESSION_EXPIRED") {
+  if (isCanceledError(error)) {
+    kind = "canceled";
+    userMessage = "Request canceled.";
+  } else if (status === 401 || status === 403 || error?.code === "SESSION_EXPIRED") {
     kind = "authentication";
     userMessage = "Your session has expired. Please sign in again.";
   } else if (status === 429) {
@@ -60,4 +67,4 @@ function annotateApiError(error) {
   return error;
 }
 
-module.exports = { annotateApiError, classifyApiError, isRetryableRequest, retryAfterMs };
+module.exports = { annotateApiError, classifyApiError, isCanceledError, isRetryableRequest, retryAfterMs };

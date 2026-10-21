@@ -19,7 +19,7 @@ export default class AppErrorBoundary extends React.Component {
     if (!this.state.error) return this.props.children;
     return (
       <View style={styles.container} accessibilityRole="alert">
-        <Text style={styles.title}>FairFare needs a fresh start</Text>
+        <Text style={styles.title}>FareRide needs a fresh start</Text>
         <Text style={styles.message}>Something unexpected happened. Your account and saved data are safe.</Text>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel="Try again" style={styles.button} onPress={this.reset}>
           <Text style={styles.buttonText}>Try again</Text>

@@ -1,23 +1,30 @@
 import axios from "axios";
-import { createRefreshSingleFlight, isRefreshAuthFailure } from "./authRetry.cjs";
+import { createRefreshSingleFlight, isRefreshAuthFailure, normalizeApiBaseUrl } from "./authRetry.cjs";
 import { annotateApiError, isRetryableRequest, retryAfterMs } from "./apiErrors.cjs";
+
+export const COMPARISON_TIMEOUT_MS = 30000;
 
 // This is the only mobile API base URL. Expo inlines EXPO_PUBLIC_* variables
 // at bundle time; restart Expo after changing the value.
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+export const AUTH_RESTORE_TIMEOUT_MS = 8000;
 
-if (!API_BASE_URL) {
-  throw new Error(
-    "[FairFare] EXPO_PUBLIC_API_BASE_URL is missing. Set it in mobile/.env " +
-      "to the backend URL, including /api (for example http://10.0.2.2:4000/api).",
-  );
+let API_BASE_URL;
+try {
+  API_BASE_URL = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
+} catch (error) {
+  if (!process.env.EXPO_PUBLIC_API_BASE_URL?.trim()) {
+    throw new Error(
+      "[FareRide] EXPO_PUBLIC_API_BASE_URL is missing. Set it in mobile/.env.local to the backend URL, including /api.",
+    );
+  }
+  throw new Error(`[FareRide] ${error.message}`);
 }
 
 const isDevelopment =
   typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
 
 if (isDevelopment) {
-  console.info(`FairFare API: ${API_BASE_URL}`);
+  console.info(`FareRide API: ${API_BASE_URL}`);
 }
 
 const apiClient = axios.create({
@@ -39,8 +46,16 @@ let sessionExpiryNotified = false;
 export function configureAuth(handlers) { authHandlers = handlers; }
 export function setAuthSigningOut(value) { authSigningOut = Boolean(value); }
 export function resetSessionExpiryNotification() { sessionExpiryNotified = false; }
-const refreshOnce = createRefreshSingleFlight(() => authHandlers.refresh());
+const refreshOnce = createRefreshSingleFlight((options) => authHandlers.refresh(options));
 apiClient.interceptors.request.use(async (config) => {
+  if (config._authDeadlineAt == null && Number.isFinite(Number(config.authDeadlineMs))) {
+    config._authDeadlineAt = Date.now() + Number(config.authDeadlineMs);
+  }
+  if (config._authDeadlineAt != null) {
+    const remaining = Number(config._authDeadlineAt) - Date.now();
+    if (remaining <= 0) throw Object.assign(new Error("Authentication startup timed out"), { code: "AUTH_RESTORE_TIMEOUT" });
+    config.timeout = Math.min(Number(config.timeout) || 15000, remaining);
+  }
   if (!config.skipAuth) { const session = await authHandlers.getSession?.(); if (session?.accessToken) config.headers.Authorization = `Bearer ${session.accessToken}`; }
   return config;
 });
@@ -48,7 +63,12 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
   const config = error.config;
   if (error.response?.status === 401 && !config?._authRetried && !config?.skipAuth && !authSigningOut && authHandlers.refresh && !config?.url?.includes("/auth/refresh")) {
     config._authRetried = true;
-    try { const session = await refreshOnce(); config.headers.Authorization = `Bearer ${session.accessToken}`; return apiClient(config); }
+    try {
+      const remaining = config._authDeadlineAt == null ? undefined : Math.max(1, Number(config._authDeadlineAt) - Date.now());
+      const session = await refreshOnce({ timeout: remaining, authDeadlineAt: config._authDeadlineAt });
+      config.headers.Authorization = `Bearer ${session.accessToken}`;
+      return apiClient(config);
+    }
     catch (refreshError) {
       const isSessionExpired = isRefreshAuthFailure(refreshError);
       if (isSessionExpired && !sessionExpiryNotified) { sessionExpiryNotified = true; await authHandlers.signOut?.({ reason: "SESSION_EXPIRED", silent: true }); }
@@ -73,20 +93,23 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
 function authData(response) { return response.data.data; }
 export async function authLogin(email, password) { return authData(await apiClient.post("/auth/login", { email, password }, { skipAuth: true })); }
 export async function authRegister(name, email, password) { return authData(await apiClient.post("/auth/register", { name, email, password }, { skipAuth: true })); }
-export async function authRefresh(refreshToken) { return authData(await apiClient.post("/auth/refresh", { refreshToken }, { skipAuth: true })); }
+export async function authRefresh(refreshToken, config = {}) { return authData(await apiClient.post("/auth/refresh", { refreshToken }, { ...config, skipAuth: true })); }
 export async function authLogout(refreshToken) { return apiClient.post("/auth/logout", { refreshToken }, { skipAuth: true }); }
 export async function sendVerificationEmail(email) { return authData(await apiClient.post("/auth/email/send-verification", { email }, { skipAuth: true })); }
 export async function verifyEmail(email, code) { return authData(await apiClient.post("/auth/email/verify", { email, code }, { skipAuth: true })); }
 export async function requestPasswordReset(email) { return authData(await apiClient.post("/auth/forgot-password", { email }, { skipAuth: true })); }
 export async function verifyPasswordReset(email, code) { return authData(await apiClient.post("/auth/forgot-password/verify", { email, code }, { skipAuth: true })); }
 export async function resetPassword(resetToken, newPassword, confirmPassword = newPassword) { return authData(await apiClient.post("/auth/reset-password", { resetToken, newPassword, confirmPassword }, { skipAuth: true })); }
-export async function authMe() { return authData(await apiClient.get("/auth/me")); }
+export async function authMe(config = {}) { return authData(await apiClient.get("/auth/me", config)); }
 export async function updateProfile(name) { return authData(await apiClient.patch("/auth/me", { name })); }
 export async function getPreferences() { return authData(await apiClient.get("/preferences")); }
 export async function updatePreferences(preferences) { return authData(await apiClient.put("/preferences", preferences)); }
 
-export async function compareFares(payload) {
-  const response = await apiClient.post("/fares/compare", payload);
+export async function compareFares(payload, config = {}) {
+  const response = await apiClient.post("/fares/compare", payload, {
+    ...config,
+    timeout: COMPARISON_TIMEOUT_MS,
+  });
   return response.data;
 }
 

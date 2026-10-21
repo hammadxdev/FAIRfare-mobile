@@ -17,7 +17,7 @@ test("provider cards do not present driver pickup ETA or fastest-pickup badge", 
 });
 
 test("consumer route travel duration remains visible", () => {
-  assert.match(results, /metaLabel\}>Duration/);
+  assert.match(results, /durationMin/);
   assert.match(results, /durationMin/);
   assert.match(history, /Duration unavailable/);
   assert.match(history, /durationSeconds/);
@@ -56,26 +56,37 @@ test("Yango cards keep exact, display, starting, ETA, and availability semantics
   assert.match(card, /hasLiveFare && isIndrive/);
 });
 
-test("results keep the trip summary vehicle-free and render provider sections", () => {
+test("results keep the trip summary vehicle-free and render a unified comparison", () => {
   assert.doesNotMatch(results, /metaLabel\}>Vehicle/);
   assert.doesNotMatch(results, /vehicleType/);
-  assert.match(results, /summaryEyebrow}>TRIP SUMMARY/);
-  assert.match(results, /liveInDriveResults\.map/);
-  assert.match(results, /Bykea — Live fares unavailable/);
+  assert.match(results, /Compare Fares/);
+  assert.match(results, /flattenFareOptions/);
+  assert.match(results, /Unavailable providers/);
   assert.match(results, /distanceKm/);
   assert.match(results, /durationMin/);
 });
 
-test("ResultsScreen uses one provider action below category rows", () => {
+test("ResultsScreen uses compact filters, one results scroll area, and row actions", () => {
   assert.match(results, /Open inDrive/);
   assert.match(results, /Open Yango/);
-  assert.equal((results.match(/Open inDrive/g) || []).length, 1);
-  assert.equal((results.match(/Open Yango/g) || []).length, 1);
+  assert.match(results, /selectedCategory/);
+  assert.match(results, /filterOptions/);
+  assert.match(results, /supportedFeatures/);
+  assert.match(results, /supportedServiceTiers/);
+  assert.match(results, /<ScrollView/);
+  assert.match(results, /minHeight: 72/);
+  assert.match(results, /selectedOption/);
+  assert.match(results, /Select a ride/);
   assert.doesNotMatch(results, /onOpenApp=\{handleOpenApp\}/);
-  assert.match(results, /<Text style=\{styles\.sectionTitle\}>inDrive/);
-  assert.match(results, /<Text style=\{styles\.sectionTitle\}>Yango/);
-  assert.match(results, /Bykea — Live fares unavailable/);
-  assert.doesNotMatch(results, /<ScrollView/);
+});
+
+test("ResultsScreen bounds filter chips and uses a single app header", () => {
+  const navigator = read("src/navigation/RootNavigator.js");
+  assert.match(results, /chipScroller: \{ flexGrow: 0/);
+  assert.match(results, /chips: \{ flexGrow: 0, alignItems: "center", height: 48/);
+  assert.match(results, /chip: \{ height: 40/);
+  assert.match(navigator, /name="Results"[\s\S]*?headerShown: false/);
+  assert.equal((results.match(/<Text style=\{styles\.title\}>/g) || []).length, 1);
 });
 
 test("fare rows support compact rendering without individual provider actions", () => {

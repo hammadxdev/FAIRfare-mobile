@@ -43,7 +43,7 @@ export async function autocompleteDestination(input, coordinates, signal) {
   }, { signal });
   const data = response.data?.data;
   if (data?.status === "auth_required") {
-    const error = new Error("Your FairFare session cannot access live location suggestions.");
+    const error = new Error("Your FareRide session cannot access live location suggestions.");
     error.code = "PROVIDER_AUTH_REQUIRED";
     throw error;
   }

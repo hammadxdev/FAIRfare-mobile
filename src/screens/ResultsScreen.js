@@ -1,281 +1,163 @@
-import React from "react";
-import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from "react-native";
+import React, { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import ProviderFareCard from "../components/ProviderFareCard";
 import EmptyState from "../components/EmptyState";
-import colors, { radius, shadow, spacing } from "../constants/colors";
+import colors, { radius, spacing } from "../constants/colors";
+import { formatPKR } from "../utils/formatCurrency";
 import { openProvider } from "../services/providerLauncher";
+
 const { buildComparisonRouteSnapshot } = require("../services/comparisonRouteSnapshot.cjs");
-const { expandProviderResults } = require("../utils/indriveQuotes.cjs");
-const { fareProvenance } = require("../utils/fareProvenance.cjs");
-const { expandYangoResults, yangoUiState, providerKey } = require("../utils/yangoQuotes.cjs");
+const {
+  flattenFareOptions,
+  supportedCategories,
+  supportedFeatures,
+  supportedServiceTiers,
+  filterOptions,
+  bestComparableIds,
+  providerStatusRows,
+} = require("../utils/fareComparison.cjs");
 
-function hasValidCoordinatePair(location) {
-  const latitudeValue = location?.lat ?? location?.latitude;
-  const longitudeValue = location?.lng ?? location?.longitude;
-  if (latitudeValue === null || latitudeValue === undefined || latitudeValue === "" || longitudeValue === null || longitudeValue === undefined || longitudeValue === "") return false;
-  const latitude = Number(latitudeValue);
-  const longitude = Number(longitudeValue);
-  return Number.isFinite(latitude) && latitude >= -90 && latitude <= 90 && Number.isFinite(longitude) && longitude >= -180 && longitude <= 180;
+const CATEGORY_LABELS = { bike: "Bike", car: "Car", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
+const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", rickshaw: "🛺", other: "🚕", unknown: "•" };
+
+function providerActionLabel(providerId) {
+  if (providerId === "indrive") return "Open inDrive";
+  if (providerId === "yango" || providerId === "quickride") return "Open Yango";
+  if (providerId === "urbancab" || providerId === "bykea") return "Open Bykea";
+  return "Open provider";
 }
 
-function fareIsLive(result) {
-  const key = fareProvenance(result).key;
-  return key === "live" || key === "suggested";
-}
-
-function isInDrive(result) {
-  return providerKey(result) === "indrive";
-}
-
-function unavailableReason(result, fallback) {
-  const code = typeof result?.error === "string" ? result.error : result?.error?.code;
-  if (code === "PROVIDER_AUTH_REQUIRED" || code === "AUTH_REQUIRED") return "Authentication is required for live pricing.";
-  if (code === "LIVE_INTEGRATION_NOT_CONFIGURED" || code === "PROVIDER_NOT_CONFIGURED") return "Live pricing is not configured.";
-  if (code === "PROVIDER_BAD_RESPONSE") return "The provider returned no usable fare categories.";
-  if (code === "PROVIDER_TIMEOUT") return "The provider did not respond in time.";
-  return fallback;
+function safeErrorText(reason) {
+  if (typeof reason !== "string") return "Not available right now.";
+  if (/token|secret|password|authorization|device|coordinate|latitude|longitude/i.test(reason)) return "Not available right now.";
+  return reason.length > 80 ? `${reason.slice(0, 77)}…` : reason;
 }
 
 export default function ResultsScreen({ route, navigation }) {
-  const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const result = route.params?.result;
+  const rawResults = result?.results || [];
+  const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedOption, setSelectedOption] = useState(null);
+  const options = useMemo(() => flattenFareOptions(rawResults), [rawResults]);
+  const categories = useMemo(() => supportedCategories(options), [options]);
+  const featureFilters = useMemo(() => supportedFeatures(options), [options]);
+  const tierFilters = useMemo(() => supportedServiceTiers(options), [options]);
+  const bestIds = useMemo(() => bestComparableIds(options), [options]);
 
   if (!result) {
-    return (
-      <View style={styles.flex}>
-        <EmptyState
-          icon="🔍"
-          title="No comparison yet"
-          message="Go back to Home and search for a ride to see fare comparisons here."
-        />
-      </View>
-    );
+    return <View style={styles.flex}><EmptyState icon="🔍" title="No comparison yet" message="Go back to Home and search for a ride to see fare comparisons here." /></View>;
   }
 
-  const { pickup, dropoff, distanceKm, durationMin, results = [] } = result;
+  const { pickup, dropoff, distanceKm, durationMin } = result;
   const comparisonRoute = buildComparisonRouteSnapshot(result);
-  const displayResults = expandProviderResults(results);
-  const inDriveResults = displayResults.filter(isInDrive);
-  const liveInDriveResults = inDriveResults.filter((item) => fareIsLive(item));
-  const inDriveResult = results.find(isInDrive);
-  const yangoState = yangoUiState(results);
-  const yangoResults = expandYangoResults(results);
-  const yangoResult = results.find((item) => ["yango", "quickride"].includes(providerKey(item)));
-  const compact = height < 900;
-  const verySmall = height < 650;
-  const availableYangoResults = yangoResults.filter((item) => item.isAvailable);
-  const unavailableYangoResults = yangoResults.filter((item) => !item.isAvailable);
-  const visibleYangoResults = verySmall ? availableYangoResults : yangoResults;
+  const filtered = filterOptions(options, selectedCategory).sort((a, b) => (a.category === "unknown") - (b.category === "unknown") || a.fare - b.fare);
+  const statuses = providerStatusRows(rawResults).filter((status) => !status.available);
 
-  if (__DEV__) {
-    console.info("[fare] ResultsScreen response diagnostics", {
-      topLevelKeys: Object.keys(result).sort(),
-      parsedProviders: results.map((item) => ({
-        providerId: item?.provider?.id || null,
-        resolvedProviderCode: providerKey(item) || null,
-        rawCategoryCount: Array.isArray(item?.quotes) ? item.quotes.length : 0,
-        postFilterCategoryCount: providerKey(item) === "indrive"
-          ? expandProviderResults([item]).length
-          : providerKey(item) === "quickride" || providerKey(item) === "yango"
-            ? expandYangoResults([item]).length
-            : 0,
-        renderedLiveOptionCount: providerKey(item) === "indrive"
-          ? expandProviderResults([item]).filter(fareIsLive).length
-          : providerKey(item) === "quickride" || providerKey(item) === "yango"
-            ? expandYangoResults([item]).filter((quote) => quote.isAvailable === true && fareIsLive(quote)).length
-            : 0,
-        exactFareCount: Array.isArray(item?.quotes) ? item.quotes.filter((quote) => Number.isFinite(Number(quote?.fare)) && Number(quote.fare) > 0 && quote?.isAvailable === true).length : 0,
-        displayOnlyCount: Array.isArray(item?.quotes) ? item.quotes.filter((quote) => quote?.displayFare != null && quote?.fare == null).length : 0,
-        unavailableCount: Array.isArray(item?.quotes) ? item.quotes.filter((quote) => quote?.isAvailable === false || quote?.availability === "unavailable").length : 0,
-        source: item?.source || item?.quotes?.[0]?.source || null,
-        dataSource: item?.dataSource || item?.quotes?.[0]?.dataSource || item?.metadata?.dataSource || null,
-        filterRejectionReason: !providerKey(item) ? "provider_identity_missing" : null,
-      })),
-    });
-  }
-
-  const handleOpenApp = (providerResult, fallbackProviderId) => {
-    const providerId = providerResult?.provider?.name || fallbackProviderId;
-    if (__DEV__) {
-      console.log("[ProviderLaunch] button handler", providerId, {
-        pickupValid: hasValidCoordinatePair(pickup),
-        destinationValid: hasValidCoordinatePair(dropoff),
-      });
-    }
-    return openProvider(providerId, comparisonRoute || {});
-  };
-  const handleAskAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
+  const openOption = (option) => openProvider(option?.providerName || "", comparisonRoute || {});
+  const askAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
 
   return (
     <SafeAreaView style={styles.flex} edges={["top", "bottom"]}>
-      <View style={[styles.content, compact && styles.contentCompact, { paddingTop: Math.max(spacing.xs, insets.top / 2), paddingBottom: Math.max(spacing.xs, insets.bottom / 2) }]}>
-      <View style={styles.summaryCard}>
-        <Text style={styles.summaryEyebrow}>TRIP SUMMARY</Text>
-        <View style={styles.routeRow}>
-          <View style={styles.routeDotAccent} />
-          <Text style={styles.routeText} numberOfLines={1}>
-            {pickup?.name}
-          </Text>
-        </View>
-        <View style={styles.routeConnector} />
-        <View style={styles.routeRow}>
-          <View style={styles.routeDotDanger} />
-          <Text style={styles.routeText} numberOfLines={1}>
-            {dropoff?.name}
-          </Text>
+      <View style={[styles.screen, { paddingTop: Math.max(spacing.xs, insets.top / 2), paddingBottom: Math.max(spacing.xs, insets.bottom / 2) }]}>
+        <View style={styles.topBar}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={() => navigation.goBack()} style={styles.backButton}><Text style={styles.backText}>‹</Text></Pressable>
+          <Text style={styles.title}>Compare Fares</Text>
+          <View style={styles.topBarSpacer} />
         </View>
 
-        <View style={styles.metaRow}>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Distance</Text>
-            <Text style={styles.metaValue}>{distanceKm} km</Text>
-          </View>
-          <View style={styles.metaItem}>
-            <Text style={styles.metaLabel}>Duration</Text>
-            <Text style={styles.metaValue}>{durationMin} min</Text>
-          </View>
+        <View style={styles.tripCard}>
+          <View style={styles.locationRow}><View style={[styles.locationDot, { backgroundColor: colors.accent }]} /><Text numberOfLines={1} style={styles.locationText}>{pickup?.name || "Pickup"}</Text></View>
+          <View style={styles.routeLine} />
+          <View style={styles.locationRow}><View style={[styles.locationDot, { backgroundColor: colors.navy }]} /><Text numberOfLines={1} style={styles.locationText}>{dropoff?.name || "Destination"}</Text></View>
+          <View style={styles.tripMeta}><Text style={styles.metaText}>{distanceKm} km</Text><Text style={styles.metaDivider}>•</Text><Text style={styles.metaText}>{durationMin} min</Text></View>
         </View>
-      </View>
 
-      <TouchableOpacity style={[styles.askAiButton, compact && styles.buttonCompact]} onPress={handleAskAi} disabled={!result.comparisonId}>
-        <Text style={styles.askAiText}>{result.comparisonId ? "Ask AI about these rides" : "AI context unavailable"}</Text>
-      </TouchableOpacity>
+        <ScrollView horizontal style={styles.chipScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          {["all", ...categories, ...featureFilters, ...tierFilters].map((category) => (
+            <Pressable key={category} accessibilityRole="button" accessibilityState={{ selected: selectedCategory === category }} onPress={() => setSelectedCategory(category)} style={[styles.chip, selectedCategory === category && styles.chipSelected]}>
+              <Text style={[styles.chipText, selectedCategory === category && styles.chipTextSelected]}>{category === "all" ? "All" : CATEGORY_LABELS[category]}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
 
-      <View style={[styles.providerSection, compact && styles.providerSectionCompact]}>
-        <View style={styles.providerSectionHeader}>
-          <Text style={styles.sectionTitle}>inDrive</Text>
-          <Text style={styles.sectionMeta}>{liveInDriveResults.length} {liveInDriveResults.length === 1 ? "option" : "options"}</Text>
+        <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false}>
+          {filtered.length === 0 ? <View style={styles.emptyResults}><Text style={styles.emptyTitle}>No comparable fares</Text><Text style={styles.emptyText}>Available estimates will appear here when providers respond.</Text></View> : null}
+          {filtered.map((option) => (
+            <Pressable key={option.optionId} accessibilityRole="button" accessibilityState={{ selected: selectedOption?.optionId === option.optionId }} onPress={() => setSelectedOption(option)} style={[styles.fareRow, selectedOption?.optionId === option.optionId && styles.fareRowSelected]}>
+              <Text style={styles.vehicleIcon}>{CATEGORY_ICONS[option.category] || CATEGORY_ICONS.unknown}</Text>
+              <View style={styles.fareDetails}>
+                <View style={styles.fareTitleLine}><Text numberOfLines={1} style={styles.providerName}>{option.providerName}</Text>{bestIds.has(option.optionId) && selectedCategory !== "all" ? <Text style={styles.bestBadge}>BEST</Text> : null}</View>
+                <Text numberOfLines={1} style={styles.serviceLabel}>{option.serviceLabel}{option.category !== "unknown" ? ` · ${CATEGORY_LABELS[option.category]}` : ""}{option.features.includes("AC") ? " · AC" : ""}</Text>
+              </View>
+              <View style={styles.fareRight}><Text style={styles.fareAmount}>{option.currency === "PKR" ? formatPKR(option.fare) : `${option.currency || ""} ${option.fare}`}</Text><Text style={styles.estimateText}>{option.priceType === "suggested" || option.fareType === "RECOMMENDED" ? "Suggested" : "Live estimate"}</Text></View>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          ))}
+
+          {statuses.length > 0 ? <Text style={styles.sectionLabel}>Unavailable providers</Text> : null}
+          {statuses.map((status) => <View key={status.providerId} style={styles.statusRow}><Text style={styles.statusName}>{status.providerName} · Not available</Text><Text numberOfLines={1} style={styles.statusReason}>{safeErrorText(status.reason)}</Text></View>)}
+          <Pressable accessibilityRole="button" disabled={!result.comparisonId} onPress={askAi} style={[styles.aiButton, !result.comparisonId && styles.disabledButton]}><Text style={styles.aiButtonText}>Ask AI about these rides</Text></Pressable>
+          <Text style={styles.disclaimer}>Estimates may change before booking.</Text>
+        </ScrollView>
+        <View style={styles.actionBar}>
+          <Pressable accessibilityRole="button" disabled={!selectedOption} onPress={() => openOption(selectedOption)} style={[styles.openButton, !selectedOption && styles.disabledButton]}>
+            <Text style={styles.openButtonText}>{selectedOption ? providerActionLabel(selectedOption.providerId) : "Select a ride"}</Text>
+          </Pressable>
         </View>
-        {liveInDriveResults.length === 0 ? <Text style={styles.unavailableText}>{unavailableReason(inDriveResult, "Live inDrive prices are currently unavailable.")}</Text> : null}
-        {liveInDriveResults.map((item, index) => (
-          <ProviderFareCard
-            key={`${item.provider?.id || item.provider?.name || "indrive"}-${item.categoryId || "category"}-${index}`}
-            result={item}
-            compact
-          />
-        ))}
-        <TouchableOpacity style={[styles.providerButton, compact && styles.buttonCompact]} onPress={() => handleOpenApp(liveInDriveResults[0] || inDriveResult, "indrive")}><Text style={styles.providerButtonText}>Open inDrive</Text></TouchableOpacity>
-      </View>
-
-      <View style={[styles.providerSection, compact && styles.providerSectionCompact]}>
-        <View style={styles.providerSectionHeader}>
-          <Text style={styles.sectionTitle}>Yango</Text>
-          <Text style={styles.sectionMeta}>{yangoState.authorized ? `${availableYangoResults.length} options` : "Unavailable"}</Text>
-        </View>
-        {!yangoState.authorized ? <Text style={styles.unavailableText}>{unavailableReason(yangoResult, "Yango live pricing is currently unavailable.")}</Text> : null}
-        {visibleYangoResults.map((item) => (
-          <ProviderFareCard key={`yango-${item.categoryId}`} result={item} compact />
-        ))}
-        {verySmall && unavailableYangoResults.length > 0 ? <Text style={styles.compactUnavailableNote}>{unavailableYangoResults.length} unavailable category{unavailableYangoResults.length === 1 ? "" : "ies"}</Text> : null}
-        <TouchableOpacity style={[styles.providerButton, compact && styles.buttonCompact]} onPress={() => handleOpenApp(yangoResults.find((item) => item.isAvailable) || yangoResult, "quickride")}><Text style={styles.providerButtonText}>Open Yango</Text></TouchableOpacity>
-      </View>
-
-      <View style={[styles.providerSection, styles.bykeaSection, compact && styles.providerSectionCompact]}>
-        <Text style={styles.bykeaText}>Bykea — Live fares unavailable</Text>
-        <TouchableOpacity style={[styles.providerButton, compact && styles.buttonCompact]} onPress={() => handleOpenApp({ provider: { name: "urbancab" } })}><Text style={styles.providerButtonText}>Open Bykea</Text></TouchableOpacity>
-      </View>
-
-      <Text style={[styles.disclaimer, compact && styles.disclaimerCompact]}>
-        Prices shown here are live provider estimates and may change before booking.
-      </Text>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: { flex: 1, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, justifyContent: "space-between" },
-  contentCompact: { paddingHorizontal: spacing.sm, paddingVertical: spacing.xs },
-  summaryCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.sm,
-    marginBottom: spacing.sm,
-    ...shadow,
-  },
-  summaryEyebrow: { color: colors.forest, fontSize: 9, fontWeight: "900", letterSpacing: 1, marginBottom: spacing.xs },
-  routeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  routeDotAccent: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.accent,
-    marginRight: spacing.sm,
-  },
-  routeDotDanger: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.danger,
-    marginRight: spacing.sm,
-  },
-  routeConnector: {
-    width: 1,
-    height: 14,
-    backgroundColor: colors.border,
-    marginLeft: 4,
-    marginVertical: 2,
-  },
-  routeText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.primary,
-    flexShrink: 1,
-  },
-  metaRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: spacing.sm,
-    paddingTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  metaItem: {
-    alignItems: "flex-start",
-  },
-  metaLabel: {
-    fontSize: 11,
-    color: colors.muted,
-    marginBottom: 2,
-  },
-  metaValue: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  providerSection: { backgroundColor: colors.card, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginBottom: spacing.xs, ...shadow },
-  providerSectionCompact: { padding: spacing.xs, marginBottom: 2 },
-  providerSectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: spacing.xs },
-  sectionTitle: { fontSize: 13, fontWeight: "900", color: colors.primary },
-  sectionMeta: { color: colors.forest, fontSize: 10, fontWeight: "800" },
-  unavailableSection: { backgroundColor: colors.surfaceMuted, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, padding: spacing.sm, marginBottom: spacing.xs },
-  unavailableSectionCompact: { padding: spacing.xs, marginBottom: 2 },
-  unavailableText: { color: colors.muted, fontSize: 11, lineHeight: 14 },
-  compactUnavailableNote: { color: colors.muted, fontSize: 9, lineHeight: 12, marginTop: 2 },
-  bykeaSection: { backgroundColor: colors.surfaceMuted },
-  bykeaText: { color: colors.muted, fontSize: 11, fontWeight: "700" },
-  disclaimer: {
-    fontSize: 11,
-    color: colors.muted,
-    textAlign: "center",
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.xs,
-  },
-  disclaimerCompact: { fontSize: 9 },
-  askAiButton: { backgroundColor: colors.navy, borderRadius: radius.md, paddingVertical: 9, alignItems: "center", marginBottom: spacing.sm },
-  buttonCompact: { paddingVertical: 6 },
-  providerButton: { backgroundColor: colors.accent, borderRadius: radius.md, paddingVertical: 8, alignItems: "center", marginTop: spacing.xs },
-  providerButtonText: { color: colors.white, fontWeight: "800", fontSize: 12 },
-  askAiText: { color: colors.white, fontWeight: "800", fontSize: 13 },
+  flex: { flex: 1, backgroundColor: colors.background },
+  screen: { flex: 1, paddingHorizontal: spacing.md, minHeight: 0 },
+  topBar: { minHeight: 48, flexDirection: "row", alignItems: "center" },
+  backButton: { width: 48, height: 48, alignItems: "flex-start", justifyContent: "center" },
+  backText: { fontSize: 34, lineHeight: 36, color: colors.primary },
+  topBarSpacer: { width: 48 },
+  title: { flex: 1, textAlign: "center", color: colors.primary, fontSize: 20, fontWeight: "800" },
+  tripCard: { backgroundColor: colors.surfaceContainer, borderRadius: radius.lg, padding: spacing.md, borderWidth: 1, borderColor: colors.outlineVariant },
+  locationRow: { flexDirection: "row", alignItems: "center", minHeight: 28 },
+  locationDot: { width: 10, height: 10, borderRadius: 5, marginRight: spacing.sm },
+  locationText: { flex: 1, color: colors.primary, fontSize: 14, fontWeight: "600" },
+  routeLine: { width: 1, height: 10, marginLeft: 4, backgroundColor: colors.outline },
+  tripMeta: { flexDirection: "row", alignItems: "center", marginTop: spacing.sm },
+  metaText: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
+  metaDivider: { color: colors.outline, marginHorizontal: spacing.sm },
+  chipScroller: { flexGrow: 0, flexShrink: 0, height: 48 },
+  chips: { flexGrow: 0, alignItems: "center", height: 48, gap: spacing.sm },
+  chip: { height: 40, minHeight: 40, flexGrow: 0, flexShrink: 0, alignSelf: "center", paddingHorizontal: spacing.md, borderRadius: radius.full, borderWidth: 1, borderColor: colors.outline, justifyContent: "center" },
+  chipSelected: { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
+  chipText: { color: colors.primary, fontSize: 13, fontWeight: "700" },
+  chipTextSelected: { color: colors.white },
+  results: { flex: 1, minHeight: 0 },
+  resultsContent: { paddingBottom: spacing.md, gap: spacing.sm },
+  fareRow: { minHeight: 72, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outlineVariant, flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  fareRowSelected: { borderColor: colors.primaryDark, backgroundColor: colors.softGreen, borderWidth: 2 },
+  vehicleIcon: { width: 34, textAlign: "center", fontSize: 21 },
+  fareDetails: { flex: 1, minWidth: 0 },
+  fareTitleLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
+  providerName: { flexShrink: 1, color: colors.primary, fontSize: 14, fontWeight: "800" },
+  serviceLabel: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
+  bestBadge: { color: colors.success, fontSize: 9, fontWeight: "900" },
+  fareRight: { alignItems: "flex-end", minWidth: 70 },
+  fareAmount: { color: colors.primary, fontSize: 15, fontWeight: "900" },
+  estimateText: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
+  chevron: { width: 24, textAlign: "center", color: colors.outline, fontSize: 26 },
+  actionBar: { paddingTop: spacing.sm, paddingBottom: spacing.xs, backgroundColor: colors.background },
+  openButton: { minHeight: 48, paddingHorizontal: spacing.md, borderRadius: radius.full, backgroundColor: colors.navy, alignItems: "center", justifyContent: "center" },
+  openButtonText: { color: colors.white, fontSize: 11, fontWeight: "800" },
+  sectionLabel: { color: colors.primary, fontSize: 13, fontWeight: "900", marginTop: spacing.sm },
+  statusRow: { minHeight: 48, paddingHorizontal: spacing.sm, justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.surfaceMuted },
+  statusName: { color: colors.textSecondary, fontSize: 12, fontWeight: "800" },
+  statusReason: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  emptyResults: { padding: spacing.lg, alignItems: "center", backgroundColor: colors.surfaceContainer, borderRadius: radius.md },
+  emptyTitle: { color: colors.primary, fontWeight: "800", fontSize: 15 },
+  emptyText: { color: colors.textSecondary, textAlign: "center", fontSize: 12, marginTop: spacing.xs },
+  aiButton: { minHeight: 32, alignItems: "center", justifyContent: "center", marginTop: spacing.xs, paddingHorizontal: spacing.sm },
+  disabledButton: { opacity: 0.5 },
+  aiButtonText: { color: colors.navy, fontSize: 12, fontWeight: "800" },
+  disclaimer: { color: colors.muted, fontSize: 10, textAlign: "center", paddingVertical: spacing.xs },
 });

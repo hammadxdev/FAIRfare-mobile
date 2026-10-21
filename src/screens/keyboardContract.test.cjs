@@ -5,6 +5,7 @@ const path = require("node:path");
 
 const root = path.join(__dirname, "../..");
 const chat = fs.readFileSync(path.join(root, "src/screens/AIChatScreen.js"), "utf8");
+const home = fs.readFileSync(path.join(root, "src/screens/HomeScreen.js"), "utf8");
 const composer = fs.readFileSync(path.join(root, "src/components/ai/AIChatComposer.js"), "utf8");
 const config = fs.readFileSync(path.join(root, "app.config.js"), "utf8");
 
@@ -18,4 +19,10 @@ test("chat keeps a keyboard avoiding container and usable composer", () => {
 
 test("Android uses resize mode for keyboard layout", () => {
   assert.match(config, /softwareKeyboardLayoutMode: "resize"/);
+});
+
+test("web Home sheet responds to the visual viewport keyboard inset", () => {
+  assert.match(home, /visualViewport/);
+  assert.match(home, /webKeyboardInset/);
+  assert.match(home, /bottom: webKeyboardInset/);
 });

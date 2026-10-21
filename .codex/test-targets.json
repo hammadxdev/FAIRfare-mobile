@@ -1,0 +1,60 @@
+{
+  "location_and_route": {
+    "label": "Location and route contracts",
+    "area": "location, route payloads, geometry, eligibility, synchronization",
+    "files": [
+      "src/utils/locationAccuracy.test.cjs",
+      "src/utils/locationFormatting.test.cjs",
+      "src/utils/locationPayload.test.cjs",
+      "src/utils/locationSync.test.cjs",
+      "src/utils/mapRegion.test.cjs",
+      "src/utils/routeEligibility.test.cjs",
+      "src/utils/routeGeometry.test.cjs",
+      "src/utils/routePayload.test.cjs",
+      "src/screens/locationIsolationContract.test.cjs",
+      "src/screens/locationRouteContract.test.cjs"
+    ]
+  },
+  "fare_and_provider": {
+    "label": "Fare comparison and provider handoff",
+    "area": "fare provenance, provider links, fare comparison timing",
+    "files": [
+      "src/utils/fareProvenance.test.cjs",
+      "src/screens/fareComparisonDelayContract.test.cjs",
+      "src/services/providerLauncherLogic.test.cjs"
+    ]
+  },
+  "api_and_auth": {
+    "label": "API errors and authentication",
+    "area": "API error handling, authentication retry, verification status",
+    "files": [
+      "src/services/apiErrors.test.cjs",
+      "src/services/authRetry.test.cjs",
+      "src/screens/verificationEmailStatus.test.cjs"
+    ]
+  },
+  "component_contracts": {
+    "label": "Component and interaction contracts",
+    "area": "maps, autocomplete, keyboard, loading, provider cards, error boundaries",
+    "files": [
+      "src/components/appErrorBoundaryContract.test.cjs",
+      "src/components/autocompleteVisibilityContract.test.cjs",
+      "src/components/LoadingOverlay.test.cjs",
+      "src/components/locationSuggestionListContract.test.cjs",
+      "src/components/nativeMapContract.test.cjs",
+      "src/components/pickupMapAdjustmentContract.test.cjs",
+      "src/components/providerFareCardContract.test.cjs",
+      "src/screens/autocompleteDependency.test.cjs",
+      "src/screens/keyboardContract.test.cjs",
+      "src/screens/stabilizationContract.test.cjs"
+    ]
+  },
+  "ai_and_identity": {
+    "label": "AI availability and identity contracts",
+    "area": "AI availability and city identity normalization",
+    "files": [
+      "src/screens/aiAvailabilityContract.test.cjs",
+      "src/utils/cityIdentity.test.cjs"
+    ]
+  }
+}

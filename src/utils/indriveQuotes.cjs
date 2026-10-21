@@ -18,6 +18,8 @@ function expandProviderResults(results = []) {
       categoryId: quote.categoryId,
       categoryName: quote.categoryName || null,
       normalizedCategory: quote.normalizedCategory || "UNKNOWN",
+      vehicleCategory: quote.vehicleCategory || "unknown",
+      providerServiceLabel: quote.providerServiceLabel || null,
       fare: quote.fare,
       fareRecommended: quote.fareRecommended ?? quote.fare,
       fareMin: quote.fareMin ?? null,

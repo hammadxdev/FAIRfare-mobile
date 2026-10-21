@@ -13,11 +13,11 @@ function IconButton({ label, icon, onPress, testID }) {
 export default function AIChatHeader({ onOpenDrawer, onNewChat, contextLabel }) {
   const insets = useSafeAreaInsets();
   return <View style={styles.wrapper}>
-    <View style={[styles.header, { paddingTop: insets.top + spacing.sm, minHeight: 72 + insets.top }]}>
+    <View style={[styles.header, { paddingTop: insets.top, minHeight: 64 + insets.top }]}>
       <IconButton label="Open conversations" icon="≡" onPress={onOpenDrawer} testID="open-conversations" />
       <View style={styles.heading}>
         <Text style={styles.title} numberOfLines={1}>AI Ride Assistant</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>Grounded in your FairFare data</Text>
+        <Text style={styles.subtitle} numberOfLines={1}>Grounded in your FareRide data</Text>
       </View>
       <IconButton label="New chat" icon="＋" onPress={onNewChat} testID="new-chat" />
     </View>
@@ -26,14 +26,14 @@ export default function AIChatHeader({ onOpenDrawer, onNewChat, contextLabel }) 
 }
 
 const styles = StyleSheet.create({
-  wrapper: { backgroundColor: colors.card, borderBottomWidth: 1, borderBottomColor: colors.border },
-  header: { minHeight: 72, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center" },
-  iconButton: { width: 44, height: 44, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
-  icon: { color: colors.primary, fontSize: 28, lineHeight: 30, fontWeight: "400" },
+  wrapper: { backgroundColor: colors.surfaceContainer, borderBottomWidth: 1, borderBottomColor: colors.outlineVariant },
+  header: { minHeight: 64, paddingHorizontal: spacing.md, flexDirection: "row", alignItems: "center" },
+  iconButton: { width: 48, height: 48, borderRadius: radius.full, alignItems: "center", justifyContent: "center" },
+  icon: { color: colors.primary, fontSize: 26, lineHeight: 28, fontWeight: "600" },
   heading: { flex: 1, alignItems: "center", paddingHorizontal: spacing.sm },
-  title: { color: colors.primary, fontSize: 16, fontWeight: "800" },
-  subtitle: { color: colors.muted, fontSize: 11, marginTop: 3 },
-  contextChip: { flexDirection: "row", alignItems: "center", alignSelf: "center", maxWidth: "84%", marginBottom: 10, paddingHorizontal: 12, paddingVertical: 7, borderRadius: radius.full, backgroundColor: colors.softGreen },
+  title: { color: colors.primary, fontSize: 17, fontWeight: "800" },
+  subtitle: { color: colors.muted, fontSize: 10, marginTop: 2 },
+  contextChip: { flexDirection: "row", alignItems: "center", alignSelf: "center", maxWidth: "84%", marginBottom: 8, paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.full, backgroundColor: colors.softGreen },
   contextDot: { width: 7, height: 7, borderRadius: radius.full, backgroundColor: colors.accent, marginRight: 7 },
   contextText: { color: colors.forest, fontSize: 11, fontWeight: "700", flexShrink: 1 },
 });

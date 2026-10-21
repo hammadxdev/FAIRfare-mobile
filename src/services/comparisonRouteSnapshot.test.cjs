@@ -40,7 +40,7 @@ test("rejects missing, invalid, identical, or stale changed routes", () => {
 test("provider opening reads the comparison snapshot instead of device GPS", () => {
   const source = fs.readFileSync(path.join(__dirname, "../screens/ResultsScreen.js"), "utf8");
   assert.match(source, /buildComparisonRouteSnapshot\(result\)/);
-  assert.match(source, /openProvider\(providerId, comparisonRoute \|\| \{\}\)/);
+  assert.match(source, /openProvider\([^,]+, comparisonRoute \|\| \{\}\)/);
   assert.doesNotMatch(source, /deviceLocation/);
 });
 

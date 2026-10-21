@@ -2,12 +2,14 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import {
   View,
   Text,
-  ScrollView,
   TouchableOpacity,
   KeyboardAvoidingView,
+  Keyboard,
   Platform,
   Alert,
   ActivityIndicator,
+  useWindowDimensions,
+  PanResponder,
   StyleSheet,
 } from "react-native";
 import AppHeader from "../components/AppHeader";
@@ -32,14 +34,14 @@ import { formatReverseGeocode, normalizeSearchText, rankLocationSuggestions, fil
 import { normalizeRouteCoordinates, extractRouteData, isValidLocation, routeGeometryDiagnostics } from "../utils/routeGeometry.cjs";
 import { assessLocationFix } from "../utils/locationAccuracy.cjs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { collectWebLayoutDiagnostics } from "../utils/webLayoutDiagnostics.cjs";
+import { isCanceledError } from "../services/apiErrors.cjs";
 
 const MIN_AUTOCOMPLETE_LENGTH = 3;
 const AUTOCOMPLETE_DEBOUNCE_MS = 350;
 const DEFAULT_PRICING_VEHICLE_TYPE = "car";
 const IS_DEVELOPMENT = typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
 
-// A fresh random delay per Compare Fares tap — makes the loading overlay
-// feel like real work is happening instead of an instant, identical blip.
 // Mock-only fallback path, used only if ENABLE_MOCK_LOCATION_FALLBACK is
 // flipped on (e.g. offline demo) and the real backend call fails.
 function filterMockLocations(query) {
@@ -84,6 +86,43 @@ function hasFullNameTokenMatch(item, query) {
 
 export default function HomeScreen({ navigation, route }) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
+  const [webKeyboardInset, setWebKeyboardInset] = useState(0);
+  const [sheetExpanded, setSheetExpanded] = useState(false);
+  const sheetBeforeKeyboardRef = useRef(false);
+  const keyboardWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof window === "undefined" || !window.visualViewport) return undefined;
+    const updateKeyboardInset = () => setWebKeyboardInset(Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop));
+    updateKeyboardInset();
+    window.visualViewport.addEventListener("resize", updateKeyboardInset);
+    window.visualViewport.addEventListener("scroll", updateKeyboardInset);
+    return () => {
+      window.visualViewport.removeEventListener("resize", updateKeyboardInset);
+      window.visualViewport.removeEventListener("scroll", updateKeyboardInset);
+    };
+  }, []);
+  useEffect(() => {
+    if (Platform.OS !== "web") return;
+    if (webKeyboardInset > 0) keyboardWasOpenRef.current = true;
+    else if (keyboardWasOpenRef.current) {
+      setSheetExpanded(sheetBeforeKeyboardRef.current);
+      keyboardWasOpenRef.current = false;
+    }
+  }, [webKeyboardInset]);
+  useEffect(() => {
+    if (Platform.OS !== "web" || !IS_DEVELOPMENT) return undefined;
+    const timer = setTimeout(() => console.info("[layout] FairRide web dimensions", collectWebLayoutDiagnostics()), 0);
+    return () => clearTimeout(timer);
+  }, [webKeyboardInset, sheetExpanded]);
+  const sheetHandleResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 4,
+    onPanResponderRelease: (_, gesture) => {
+      if (gesture.dy < -18) setSheetExpanded(true);
+      if (gesture.dy > 18) setSheetExpanded(false);
+    },
+  }), []);
   useEffect(() => {
     getProviderStatus().catch((err) => { if (IS_DEVELOPMENT) console.warn("[providers] status unavailable", err?.message || err); });
   }, []);
@@ -115,6 +154,7 @@ export default function HomeScreen({ navigation, route }) {
   const routeCacheRef = useRef(new Map());
   const routeRequestIdRef = useRef(0);
   const compareRequestIdRef = useRef(0);
+  const compareAbortRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState(null);
 
   const [selectingMode, setSelectingMode] = useState("pickup");
@@ -128,6 +168,21 @@ export default function HomeScreen({ navigation, route }) {
   const [saveRouteError, setSaveRouteError] = useState(null);
   const compareAgainHandledRef = useRef(null);
   const savedRouteHandledRef = useRef(null);
+  const navigationRestoreSourceRef = useRef("none");
+  const homeDiagnosticSequenceRef = useRef(0);
+
+  function restoreRoute(normalized, source) {
+    if (!normalized) return;
+    navigationRestoreSourceRef.current = source === "saved-route" ? "savedRoute" : source === "compare-again" ? "compareAgain" : "none";
+    pickupRef.current = null;
+    dropoffRef.current = null;
+    setPickup(null);
+    setDropoff(null);
+    setRouteCoordinates([]);
+    setRouteInfo(null);
+    applyPickup({ ...normalized.pickup, source });
+    applyDropoff({ ...normalized.dropoff, source });
+  }
 
   useEffect(() => {
     const compareAgain = route?.params?.compareAgain;
@@ -140,8 +195,7 @@ export default function HomeScreen({ navigation, route }) {
       navigation.setParams({ compareAgain: undefined });
       return;
     }
-    applyPickup(normalized.pickup);
-    applyDropoff(normalized.dropoff);
+    restoreRoute(normalized, "compare-again");
     navigation.setParams({ compareAgain: undefined });
   }, [navigation, route?.params?.compareAgain]);
 
@@ -156,8 +210,7 @@ export default function HomeScreen({ navigation, route }) {
       navigation.setParams({ savedRoute: undefined });
       return;
     }
-    applyPickup(normalized.pickup);
-    applyDropoff(normalized.dropoff);
+    restoreRoute(normalized, "saved-route");
     navigation.setParams({ savedRoute: undefined });
   }, [navigation, route?.params?.savedRoute]);
 
@@ -177,11 +230,17 @@ export default function HomeScreen({ navigation, route }) {
   const dropoffRequestIdRef = useRef(0);
   const pickupAbortRef = useRef(null);
   const dropoffAbortRef = useRef(null);
+  const mapRequestIdRef = useRef(0);
   const pickupSelectionRef = useRef(0);
   const dropoffSelectionRef = useRef(0);
   const autocompleteCacheRef = useRef(new Map());
 
-  function handleFocusField(field) { setActiveField(field); }
+  function handleFocusField(field) {
+    sheetBeforeKeyboardRef.current = sheetExpanded;
+    setSheetExpanded(true);
+    setActiveField(field);
+    setSelectingMode(field === "dropoff" ? "destination" : "pickup");
+  }
 
   function nextSessionToken(ref) {
     if (!ref.current) ref.current = createSessionToken();
@@ -243,7 +302,7 @@ export default function HomeScreen({ navigation, route }) {
         if (err?.code === "PROVIDER_AUTH_REQUIRED" || err?.response?.status === 401) {
           setSuggestions([]);
           setStatusType("error");
-          setStatus("Your FairFare session cannot load live location suggestions. Please sign in again.");
+          setStatus("Your FareRide session cannot load live location suggestions. Please sign in again.");
         } else if (ENABLE_MOCK_LOCATION_FALLBACK) {
           const results = filterMockLocations(query);
           setSuggestions(results);
@@ -343,7 +402,10 @@ export default function HomeScreen({ navigation, route }) {
     dropoffSelectionRef.current += 1;
     setDropoffQuery((current) => current === text ? current : text);
     setErrorMessage(null);
-    if (dropoff && text !== displayNameFor(dropoff)) setDropoff(null);
+    if (dropoff && text !== displayNameFor(dropoff)) {
+      dropoffRef.current = null;
+      setDropoff(null);
+    }
 
     if (text.trim().length < MIN_AUTOCOMPLETE_LENGTH) {
       runDropoffSearch.cancel();
@@ -467,7 +529,7 @@ export default function HomeScreen({ navigation, route }) {
   // loading/suggestions/status were true, so the dropdown flashed shut.
   const shouldShowSuggestions = Boolean(activeField) && activeQuery.trim().length >= MIN_AUTOCOMPLETE_LENGTH;
 
-  const handleUseCurrentLocation = useCallback(async ({ allowOverride = false } = {}) => {
+  const handleUseCurrentLocation = useCallback(async (field = "pickup") => {
     if (locatingRef.current) return;
     locatingRef.current = true;
     setLocating(true);
@@ -483,9 +545,8 @@ export default function HomeScreen({ navigation, route }) {
         const res = await reverseGeocode(location.lat, location.lng);
         const formatted = formatReverseGeocode(res.data);
         if (!formatted.name && !formatted.address) throw new Error("The server returned no readable address.");
-        if (pickupManuallySelectedRef.current && !allowOverride) return;
-        if (allowOverride) pickupManuallySelectedRef.current = false;
-        applyPickup({
+        if (field === "pickup" && pickupManuallySelectedRef.current) return;
+        (field === "destination" ? applyDropoff : applyPickup)({
           ...formatted,
           lat: location.lat,
           lng: location.lng,
@@ -498,9 +559,8 @@ export default function HomeScreen({ navigation, route }) {
         // Don't block the user on a failed reverse geocode — fall back to a
         // clearly-labeled placeholder instead of a silent bare "Current Location".
         if (IS_DEVELOPMENT) console.error("[maps] reverse-geocode failed for current location:", err?.response?.data?.message || err?.message || err);
-        if (pickupManuallySelectedRef.current && !allowOverride) return;
-        if (allowOverride) pickupManuallySelectedRef.current = false;
-        applyPickup({
+        if (field === "pickup" && pickupManuallySelectedRef.current) return;
+        (field === "destination" ? applyDropoff : applyPickup)({
           name: "Current GPS location",
           address: "Address unavailable",
           lat: location.lat,
@@ -523,18 +583,21 @@ export default function HomeScreen({ navigation, route }) {
 
   // One fresh foreground fix per Home mount. A late response cannot replace a
   // pickup the user has already edited or selected.
-  useEffect(() => {
-    handleUseCurrentLocation();
-  }, [handleUseCurrentLocation]);
+  // GPS is requested only from an explicit field action.
 
   // Tapping the map fills whichever field is active in the Pickup/Destination
   // toggle, using reverse geocoding to turn the tapped coordinate into a
   // readable address.
   const handleMapPress = useCallback(
     async ({ lat, lng }) => {
+      Keyboard.dismiss();
+      setActiveField(null);
+      setSheetExpanded(false);
+      const requestId = ++mapRequestIdRef.current;
       setErrorMessage(null);
       try {
         const res = await reverseGeocode(lat, lng);
+        if (mapRequestIdRef.current !== requestId) return;
         const location = { ...formatReverseGeocode(res.data), lat, lng, source: "map" };
         if (selectingMode === "destination") {
           applyDropoff(location);
@@ -542,6 +605,7 @@ export default function HomeScreen({ navigation, route }) {
           applyPickup(location);
         }
       } catch (err) {
+        if (mapRequestIdRef.current !== requestId) return;
         if (IS_DEVELOPMENT) console.error("[maps] reverse-geocode failed for map tap:", err?.response?.data?.message || err?.message || err);
         setErrorMessage("Unable to load address for that location. Please try again.");
       }
@@ -570,6 +634,23 @@ export default function HomeScreen({ navigation, route }) {
   const routeReady = hasConfirmedRoadRoute && routeInfo?.compareFaresEligible !== false;
   const compareFaresEligible = routeInfo?.compareFaresEligible === true;
   const canCompare = canCompareFares({ pickup, dropoff, vehicleType }) && routeReady;
+  const routeGeometryValid = routeInfo?.geometryAvailable === true && routeCoordinates.length > 1;
+
+  useEffect(() => {
+    if (!IS_DEVELOPMENT) return;
+    homeDiagnosticSequenceRef.current += 1;
+    console.info("[home-map-state]", {
+      eventSequence: homeDiagnosticSequenceRef.current,
+      pickupValid,
+      dropoffValid,
+      pickupFieldHasSelection: Boolean(pickup && pickupQuery.trim()),
+      dropoffFieldHasSelection: Boolean(dropoff && dropoffQuery.trim()),
+      navigationRestoreActive: Boolean(route?.params?.savedRoute || route?.params?.compareAgain),
+      navigationRestoreSource: navigationRestoreSourceRef.current,
+      routeGeometryValid,
+    });
+  }, [pickup, dropoff, pickupQuery, dropoffQuery, pickupValid, dropoffValid, routeGeometryValid, route?.params?.savedRoute, route?.params?.compareAgain]);
+
   const compareButtonDisabled = !canCompare || loading;
   const compareDisableReason = loading
     ? "loading"
@@ -772,6 +853,9 @@ export default function HomeScreen({ navigation, route }) {
     setErrorMessage(null);
     const compareRequestId = ++compareRequestIdRef.current;
     const routeRequestId = routeInfo.requestId;
+    compareAbortRef.current?.abort();
+    const abortController = new AbortController();
+    compareAbortRef.current = abortController;
 
     const payload = {
       pickup: { name: displayNameFor(pickup), address: pickup.address, city: pickup.city, placeId: pickup.placeId || pickup.id, lat: pickup.lat, lng: pickup.lng },
@@ -781,8 +865,6 @@ export default function HomeScreen({ navigation, route }) {
     };
     if (IS_DEVELOPMENT) {
       console.info("[fare] compare request diagnostics", {
-        pickup: { lat: payload.pickup.lat, lng: payload.pickup.lng },
-        destination: { lat: payload.dropoff.lat, lng: payload.dropoff.lng },
         distanceMeters: Math.round(payload.route.distanceKm * 1000),
         durationSeconds: Math.round(payload.route.durationMin * 60),
         routeRequestId: payload.route.requestId,
@@ -790,11 +872,9 @@ export default function HomeScreen({ navigation, route }) {
     }
 
     try {
-      // Every tap gets its own fresh random delay so the loading overlay
-      // never feels instant or identically-timed twice in a row. Promise.all
-      // rejects as soon as compareFares() fails, so a fast backend error
-      // still surfaces immediately instead of waiting out the delay.
-      const response = await compareFares(payload);
+      // The comparison request has its own bounded timeout; provider failures
+      // are returned in the normalized response instead of fabricated here.
+      const response = await compareFares(payload, { signal: abortController.signal });
       if (compareRequestIdRef.current !== compareRequestId || routeRequestIdRef.current !== routeRequestId) return;
       if (IS_DEVELOPMENT) {
         const quoteDiagnostics = (response.data?.results || []).flatMap((item) => (item.quotes || []).map((quote) => ({
@@ -806,8 +886,6 @@ export default function HomeScreen({ navigation, route }) {
           ttlSeconds: quote.metadata?.providerTtlSeconds ?? null,
         })));
         console.info("[fare] compare response diagnostics", {
-          pickup: { lat: payload.pickup.lat, lng: payload.pickup.lng },
-          destination: { lat: payload.dropoff.lat, lng: payload.dropoff.lng },
           distanceMeters: Math.round(payload.route.distanceKm * 1000),
           durationSeconds: Math.round(payload.route.durationMin * 60),
           quotes: quoteDiagnostics,
@@ -816,15 +894,26 @@ export default function HomeScreen({ navigation, route }) {
       navigation.navigate("Results", { result: { ...response.data, quoteReceivedAt: Date.now() } });
     } catch (err) {
       if (compareRequestIdRef.current !== compareRequestId || routeRequestIdRef.current !== routeRequestId) return;
+      if (isCanceledError(err)) return;
       if (IS_DEVELOPMENT) console.error("compareFares failed:", err?.message || err);
 
       setErrorMessage(
-        "Unable to compare fares.\nLive prices are currently unavailable. Please try again later."
+        err?.fareRideError?.kind === "timeout"
+          ? "Fare comparison timed out. Please try again."
+          : "Unable to compare fares. Please try again."
       );
     } finally {
-      setLoading(false);
+      if (compareRequestIdRef.current === compareRequestId) {
+        compareAbortRef.current = null;
+        setLoading(false);
+      }
     }
   };
+
+  useEffect(() => () => {
+    compareRequestIdRef.current += 1;
+    compareAbortRef.current?.abort();
+  }, []);
 
   const handleSaveRoute = async () => {
     if (!canSaveRoute || savedRouteKey === currentRouteKey) return;
@@ -856,9 +945,9 @@ export default function HomeScreen({ navigation, route }) {
   return (
     <KeyboardAvoidingView
       style={styles.flex}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      behavior={Platform.OS === "ios" ? "padding" : Platform.OS === "android" ? "height" : undefined}
     >
-      <View style={styles.homeCanvas}>
+      <View nativeID="home-screen-canvas" style={styles.homeCanvas}>
         <MapPreview
           fullScreen
           pickup={pickup}
@@ -871,20 +960,16 @@ export default function HomeScreen({ navigation, route }) {
           onMapPress={handleMapPress}
           onAdjustLocation={(mode) => { setAdjustMode(mode); setAdjustPickupVisible(true); }}
           isRouteLoading={isRouteLoading}
+          mapBottomOverlayRatio={sheetExpanded ? 0.82 : 0.60}
         />
 
         <View style={styles.headerOverlay} pointerEvents="box-none">
-          <AppHeader subtitle="Compare live fares for your trip" />
+          <AppHeader subtitle="Live fares for your trip" compact />
         </View>
 
-        <View style={styles.bottomPanel}>
-          <ScrollView
-            style={styles.panelScroll}
-            contentContainerStyle={[styles.panelContent, { paddingBottom: spacing.lg + Math.max(insets.bottom, spacing.sm) }]}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.panelHandle} />
+        <View nativeID="home-booking-sheet" style={[styles.bottomPanel, { maxHeight: sheetExpanded ? "82%" : "60%" }, Platform.OS === "web" && webKeyboardInset > 0 ? { bottom: webKeyboardInset, height: Math.max(280, Math.min(580, windowHeight - webKeyboardInset - insets.top - 12)), maxHeight: Math.max(280, windowHeight - webKeyboardInset - insets.top - 12) } : null]}>
+          <View style={[styles.panelContent, { paddingBottom: spacing.sm + Math.max(insets.bottom, spacing.xs) }]}>
+            <View {...sheetHandleResponder.panHandlers} style={styles.panelHandle} accessibilityRole="adjustable" accessibilityLabel="Booking sheet handle" />
             <Text style={styles.greeting}>Where are you going?</Text>
 
             <View style={styles.searchCard}>
@@ -896,8 +981,9 @@ export default function HomeScreen({ navigation, route }) {
               onChangeText={handlePickupChange}
               onFocus={() => handleFocusField("pickup")}
               loading={pickupLoading}
+              compact
               dotColor={colors.accent}
-              trailing={<TouchableOpacity accessibilityRole="button" accessibilityLabel="Use current location for pickup" style={styles.gpsButton} onPress={() => handleUseCurrentLocation({ allowOverride: true })} disabled={locating}><Text style={styles.gpsIcon}>{locating ? "…" : "⌖"}</Text></TouchableOpacity>}
+              trailing={<TouchableOpacity accessibilityRole="button" accessibilityLabel="Use current location for pickup" style={styles.gpsButton} onPress={() => handleUseCurrentLocation("pickup")} disabled={locating}><Text style={styles.gpsIcon}>{locating ? "…" : "⌖"}</Text></TouchableOpacity>}
             />
             <SuggestionsOverlay
               visible={activeField === "pickup" && shouldShowSuggestions}
@@ -918,7 +1004,9 @@ export default function HomeScreen({ navigation, route }) {
               onChangeText={handleDropoffChange}
               onFocus={() => handleFocusField("dropoff")}
               loading={dropoffLoading}
+              compact
               dotColor={colors.navy}
+              trailing={<TouchableOpacity accessibilityRole="button" accessibilityLabel="Use current location for destination" style={styles.gpsButton} onPress={() => handleUseCurrentLocation("destination")} disabled={locating}><Text style={styles.gpsIcon}>{locating ? "…" : "⌖"}</Text></TouchableOpacity>}
             />
             <SuggestionsOverlay
               visible={activeField === "dropoff" && shouldShowSuggestions}
@@ -966,7 +1054,7 @@ export default function HomeScreen({ navigation, route }) {
             style={styles.compareButton}
           />
             <Text style={styles.compareHint}>{canCompare ? "Prices are fetched only when you tap Compare Fares." : "Select both locations to compare live fares."}</Text>
-          </ScrollView>
+          </View>
         </View>
 
         <PickupMapAdjuster
@@ -988,24 +1076,23 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  homeCanvas: { flex: 1, backgroundColor: colors.background, position: "relative" },
-  headerOverlay: { position: "absolute", top: 0, left: 0, right: 0, zIndex: 5 },
-  bottomPanel: { position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "66%", backgroundColor: colors.background, borderTopLeftRadius: 28, borderTopRightRadius: 28, ...shadow },
-  panelScroll: { flexGrow: 0 },
-  panelContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm, paddingBottom: spacing.lg },
-  panelHandle: { alignSelf: "center", width: 42, height: 4, borderRadius: 4, backgroundColor: colors.border, marginBottom: spacing.md },
+  homeCanvas: { flex: 1, minHeight: 0, width: "100%", height: "100%", backgroundColor: colors.background, position: "relative", overflow: "hidden" },
+  headerOverlay: { position: "absolute", top: 0, left: spacing.md, right: spacing.md, zIndex: 30, backgroundColor: "rgba(255,255,255,.90)", borderRadius: radius.lg, ...shadow },
+  bottomPanel: { position: "absolute", left: spacing.sm, right: spacing.sm, bottom: spacing.sm, zIndex: 20, maxHeight: "60%", backgroundColor: "rgba(255,255,255,.96)", borderRadius: radius.lg, borderWidth: 1, borderColor: "rgba(226,232,240,.9)", ...shadow },
+  panelContent: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, paddingBottom: spacing.md },
+  panelHandle: { alignSelf: "center", width: 36, height: 4, borderRadius: 4, backgroundColor: colors.outline, marginBottom: spacing.sm },
   greeting: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: "800",
     color: colors.primary,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   searchCard: {
-    backgroundColor: colors.card,
-    borderRadius: radius.md,
+    backgroundColor: colors.surfaceContainer,
+    borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+    borderColor: colors.outlineVariant,
+    padding: spacing.sm,
   },
   gpsButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   gpsIcon: { color: "#15803D", fontSize: 24, fontWeight: "700" },
@@ -1033,8 +1120,6 @@ const styles = StyleSheet.create({
   saveRouteText: { color: colors.forest, fontSize: 12, fontWeight: "800" },
   saveRouteTextSaved: { color: colors.success },
   saveRouteError: { color: colors.danger, fontSize: 12, fontWeight: "600", marginTop: spacing.sm },
-  compareButton: {
-    marginTop: spacing.md,
-  },
-  compareHint: { color: colors.muted, fontSize: 11, textAlign: "center", marginTop: spacing.sm },
+  compareButton: { marginTop: spacing.sm, minHeight: 48, borderRadius: radius.full },
+  compareHint: { color: colors.muted, fontSize: 11, textAlign: "center", marginTop: spacing.xs },
 });

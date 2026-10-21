@@ -23,7 +23,10 @@ test("resend only enters sent state after an accepted response", () => {
   const verify = read("VerifyEmailScreen.js");
   assert.match(verify, /const result = await sendVerificationEmail\(email\)/);
   assert.match(verify, /if \(result\?\.accepted === false\) throw new Error/);
-  assert.match(verify, /setVerificationEmailSent\(true\); setCooldown\(60\)/);
+  assert.match(verify, /setVerificationEmailSent\(true\); setCooldown\(Number\(result\?\.cooldownSeconds\) \|\| 60\)/);
+  assert.match(verify, /setRemainingResends/);
   assert.match(verify, /setVerificationEmailSent\(false\); setError\(e\.response\?\.data\?\.message \|\| e\.message \|\| DELIVERY_FAILURE_RETRY_MESSAGE\)/);
+  assert.match(verify, /EMAIL_OTP_RESEND_LIMIT/);
+  assert.match(verify, /remainingResends > 0/);
   assert.equal(DELIVERY_FAILURE_RETRY_MESSAGE, "We couldn't send the verification email. Please try again.");
 });

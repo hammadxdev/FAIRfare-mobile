@@ -101,14 +101,24 @@ function routeGeometryDiagnostics(points, origin, destination) {
   const tolerance = Math.min(5000, Math.max(2000, haversineMeters(start, end) * 0.25));
   const startSnapMeters = haversineMeters(points[0], start);
   const endSnapMeters = haversineMeters(points[points.length - 1], end);
-  const valid = startSnapMeters <= tolerance && endSnapMeters <= tolerance;
+  const endpointDistanceMeters = haversineMeters(start, end);
+  const corridorAllowanceMeters = Math.min(50000, Math.max(10000, endpointDistanceMeters * 2));
+  const maxRouteSumMeters = endpointDistanceMeters + corridorAllowanceMeters;
+  const outlierIndex = points.findIndex((point) => {
+    const routeSumMeters = haversineMeters(point, start) + haversineMeters(point, end);
+    return !Number.isFinite(routeSumMeters) || routeSumMeters > maxRouteSumMeters;
+  });
+  const valid = startSnapMeters <= tolerance && endSnapMeters <= tolerance && outlierIndex === -1;
   return {
     valid,
-    reason: valid ? null : "endpoint-snap-too-far",
+    reason: valid ? null : outlierIndex === -1 ? "endpoint-snap-too-far" : "route-point-outlier",
     pointCount: points.length,
     startSnapMeters,
     endSnapMeters,
     toleranceMeters: tolerance,
+    endpointDistanceMeters,
+    maxRouteSumMeters,
+    outlierIndex: outlierIndex === -1 ? null : outlierIndex,
   };
 }
 

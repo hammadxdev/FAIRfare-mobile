@@ -1,25 +1,17 @@
-// Converted from app.json so the Android Google Maps display key can be
-// injected from mobile/.env at prebuild time via the react-native-maps
-// config plugin, without ever hardcoding it in source. All other values
-// below are carried over unchanged from the previous app.json.
-
-if (!process.env.GOOGLE_MAPS_ANDROID_API_KEY) {
-  console.warn(
-    "[app.config.js] GOOGLE_MAPS_ANDROID_API_KEY is not set — native Android map tiles " +
-      "will not be authorized. Set it in mobile/.env or the EAS build environment.",
-  );
-}
+// Native Android maps use Google Maps through react-native-maps. The Android
+// key is read only while Expo evaluates this config for a native build.
 
 const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
 const usesLocalHttpApi = apiBaseUrl?.startsWith("http://") === true;
+const googleMapsAndroidApiKey = process.env.GOOGLE_MAPS_ANDROID_API_KEY?.trim();
 
 export default {
   expo: {
-    name: "FairFare",
+    name: "FareRide",
     slug: "fairfair",
     version: "1.0.0",
     orientation: "portrait",
-    // Use the official FairFare mark instead of the Expo starter artwork.
+    // Use the official FareRide mark instead of the Expo starter artwork.
     icon: "./assets/logo/logo.png",
     userInterfaceStyle: "light",
     splash: {
@@ -61,13 +53,8 @@ export default {
           backgroundColor: "#0F766E",
         },
       ],
-      [
-        "react-native-maps",
-        {
-          androidGoogleMapsApiKey: process.env.GOOGLE_MAPS_ANDROID_API_KEY,
-        },
-      ],
       "expo-status-bar",
+      ["react-native-maps", { androidGoogleMapsApiKey: googleMapsAndroidApiKey }],
       "./plugins/withProviderQueries",
     ],
 

@@ -6,7 +6,7 @@ const { getProviderLaunchUris, openFirstAvailable } = require("./providerLaunche
 // - geo:<lat>,<lng> resolves but opens the Android chooser on the test phone
 // - https://indrive.com/app is an official fallback
 // Route autofill is not verified for inDrive or Bykea, and Yango's route
-// candidate must still be confirmed in the provider UI. FairFare never claims
+// candidate must still be confirmed in the provider UI. FareRide never claims
 // that opening a link created a booking.
 export const PROVIDER_LAUNCH_CONFIG = {
   indrive: { label: "inDrive", url: "https://indrive.com/app" },

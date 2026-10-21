@@ -1,6 +1,6 @@
-# FairFare Mobile
+# FareRide Mobile
 
-React Native (Expo) frontend for **FairFare** — compare ride fares across
+React Native (Expo) frontend for **FareRide** — compare ride fares across
 provider adapters and deterministic fallbacks. Tagline: _Compare fares. Choose
 fair._
 

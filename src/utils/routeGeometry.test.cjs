@@ -40,7 +40,19 @@ test("reports unrelated route geometry instead of accepting it", () => {
   const points = normalizeRouteCoordinates({ geometry: { type: "LineString", coordinates: [[73, 32], [73.01, 32.01]] } });
   const diagnostics = routeGeometryDiagnostics(points, { lat: 31.5, lng: 74.3 }, { lat: 31.51, lng: 74.31 });
   assert.equal(diagnostics.valid, false);
-  assert.equal(diagnostics.reason, "endpoint-snap-too-far");
+  assert.ok(["endpoint-snap-too-far", "route-point-outlier"].includes(diagnostics.reason));
+});
+
+test("rejects a distant intermediate route outlier even when endpoints are valid", () => {
+  const points = normalizeRouteCoordinates({ polylineCoordinates: [
+    { latitude: 31.5, longitude: 74.3 },
+    { latitude: 40.7, longitude: -120.95 },
+    { latitude: 31.51, longitude: 74.31 },
+  ] });
+  const diagnostics = routeGeometryDiagnostics(points, { lat: 31.5, lng: 74.3 }, { lat: 31.51, lng: 74.31 });
+  assert.equal(diagnostics.valid, false);
+  assert.equal(diagnostics.reason, "route-point-outlier");
+  assert.equal(diagnostics.outlierIndex, 1);
 });
 
 test("unwraps both API-body and nested Axios-style route responses", () => {
