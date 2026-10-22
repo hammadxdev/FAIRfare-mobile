@@ -31,6 +31,10 @@ function buildYangoRouteUrl(tripContext = {}) {
   const startLon = getCanonicalCoordinate(pickup, "lng", "longitude");
   const endLat = getCanonicalCoordinate(destination, "lat", "latitude");
   const endLon = getCanonicalCoordinate(destination, "lng", "longitude");
+  const fallback = new URL("https://yango.com/en_pk/order/");
+  fallback.searchParams.set("gfrom", `${startLon},${startLat}`);
+  fallback.searchParams.set("gto", `${endLon},${endLat}`);
+  fallback.searchParams.set("ref", "fairfare");
   const params = new URLSearchParams({
     "start-lat": String(startLat), "start-lon": String(startLon),
     "end-lat": String(endLat), "end-lon": String(endLon),
@@ -38,6 +42,7 @@ function buildYangoRouteUrl(tripContext = {}) {
     adj_t: "vokme8e_nd9s9z9",
     lang: "en",
     adj_deeplink_js: "1",
+    adj_fallback: fallback.toString(),
   });
   return `https://yango.go.link/route?${params.toString()}`;
 }
@@ -61,9 +66,10 @@ function getIndriveLaunchUris(tripContext = {}) {
 }
 
 function getProviderLaunchUris(providerId, tripContext = {}) {
-  if (providerId === "indrive") return getIndriveLaunchUris(tripContext);
-  if (providerId === "quickride" || providerId === "yango") return getYangoLaunchUris(tripContext);
-  if (providerId === "urbancab" || providerId === "bykea") return getBykeaLaunchUris();
+  const normalizedId = typeof providerId === "string" ? providerId.trim().toLowerCase() : "";
+  if (normalizedId === "indrive") return getIndriveLaunchUris(tripContext);
+  if (normalizedId === "quickride" || normalizedId === "yango") return getYangoLaunchUris(tripContext);
+  if (normalizedId === "urbancab" || normalizedId === "bykea") return getBykeaLaunchUris();
   return [];
 }
 

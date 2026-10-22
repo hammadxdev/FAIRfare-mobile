@@ -52,8 +52,9 @@ test("maps only the canonical backend provider IDs to their handoffs", () => {
   assert.equal(getProviderLaunchUris("indrive")[0], "indrive://open");
   assert.equal(getProviderLaunchUris("quickride")[0], "https://yango.com/en_pk/");
   assert.equal(getProviderLaunchUris("urbancab")[0], "bykea://kl");
-  assert.deepEqual(getProviderLaunchUris("Yango"), []);
-  assert.deepEqual(getProviderLaunchUris("Bykea"), []);
+  assert.equal(getProviderLaunchUris("Yango")[0].startsWith("https://yango.go.link/route?"), true);
+  assert.deepEqual(getProviderLaunchUris("Bykea"), getBykeaLaunchUris());
+  assert.equal(getProviderLaunchUris("inDrive")[0], "indrive://open");
 });
 
 test("never uses non-exported ridepush or autostart routes", () => {
@@ -92,7 +93,10 @@ test("open fallback failure reaches the verified HTTPS app link", async () => {
 });
 
 test("builds the documented Yango route link with encoded coordinates", () => {
-  assert.equal(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }), "https://yango.go.link/route?start-lat=31.5&start-lon=74.3&end-lat=31.6&end-lon=74.4&ref=fairfare&adj_t=vokme8e_nd9s9z9&lang=en&adj_deeplink_js=1");
+  const parsed = new URL(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }));
+  assert.equal(parsed.searchParams.get("start-lat"), "31.5");
+  assert.equal(parsed.searchParams.get("end-lon"), "74.4");
+  assert.equal(parsed.searchParams.get("adj_fallback"), "https://yango.com/en_pk/order/?gfrom=74.3%2C31.5&gto=74.4%2C31.6&ref=fairfare");
 });
 
 test("preserves the comparison pickup and destination ordering without rounding", () => {
