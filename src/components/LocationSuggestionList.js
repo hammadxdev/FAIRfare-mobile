@@ -1,27 +1,53 @@
 import React from "react";
 import { View, Text, Pressable, StyleSheet } from "react-native";
 import colors from "../constants/colors";
+import { getLocationSecondaryText } from "../utils/locationDisplay";
+
+function distanceLabel(item) {
+  if (!Number.isFinite(item.distanceMeters)) return "";
+  return item.distanceMeters < 1000 ? `${Math.round(item.distanceMeters)} m away` : `${(item.distanceMeters / 1000).toFixed(1)} km away`;
+}
+
+function matchLabel(item) {
+  if (item.matchStrength === "strong") return "Best match";
+  if (item.matchStrength === "related") return "Related match";
+  return "Partial match";
+}
+
+function suggestionKey(item, index, usedKeys) {
+  const base = item?.id || item?.placeId || `${item?.name || item?.description || "location"}-${item?.lat ?? ""}-${item?.lng ?? ""}`;
+  const key = String(base);
+  if (!usedKeys.has(key)) {
+    usedKeys.add(key);
+    return key;
+  }
+  const uniqueKey = `${key}-${index}`;
+  usedKeys.add(uniqueKey);
+  return uniqueKey;
+}
 
 export default function LocationSuggestionList({ suggestions, onSelect }) {
-  if (!suggestions || suggestions.length === 0) return null;
+  const safeSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
+  if (safeSuggestions.length === 0) return null;
+  const usedKeys = new Set();
 
   return (
     <View>
-      {suggestions.map((item, index) => (
+      {safeSuggestions.map((item, index) => (
         <Pressable
-          key={item.id}
-          onPress={() => onSelect(item)}
+          key={suggestionKey(item, index, usedKeys)}
+          onPress={() => onSelect?.(item)}
           style={({ pressed }) => [
             styles.item,
-            index === suggestions.length - 1 && styles.lastItem,
+            index === safeSuggestions.length - 1 && styles.lastItem,
             pressed && styles.itemPressed,
           ]}
         >
           <Text style={styles.name} numberOfLines={1}>
-            {item.name}
+            {item.name || item.description || "Unnamed location"}
           </Text>
           <Text style={styles.address} numberOfLines={1}>
-            {item.address}
+            {[matchLabel(item), getLocationSecondaryText(item) || item.address, distanceLabel(item)].filter(Boolean).join(" · ")}
           </Text>
         </Pressable>
       ))}

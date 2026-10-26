@@ -40,10 +40,9 @@ test("does not build a geo URI when coordinates are missing", () => {
   ]);
 });
 
-test("prefers the verified direct inDrive app launch before geo and HTTPS fallback", () => {
+test("uses a direct inDrive app launch and official web fallback, never a maps URI", () => {
   assert.deepEqual(getIndriveLaunchUris({ pickup: { lat: "31.5", lng: "74.3" } }), [
     "indrive://open",
-    "geo:31.5,74.3",
     "https://indrive.com/app",
   ]);
 });
@@ -52,8 +51,9 @@ test("maps only the canonical backend provider IDs to their handoffs", () => {
   assert.equal(getProviderLaunchUris("indrive")[0], "indrive://open");
   assert.equal(getProviderLaunchUris("quickride")[0], "https://yango.com/en_pk/");
   assert.equal(getProviderLaunchUris("urbancab")[0], "bykea://kl");
-  assert.deepEqual(getProviderLaunchUris("Yango"), []);
-  assert.deepEqual(getProviderLaunchUris("Bykea"), []);
+  assert.equal(getProviderLaunchUris("Yango", { pickup: { lat: 31.5, lng: 74.3 }, destination: { lat: 31.6, lng: 74.4 } })[0].startsWith("https://yango.go.link/route?"), true);
+  assert.deepEqual(getProviderLaunchUris("Bykea"), getBykeaLaunchUris());
+  assert.equal(getProviderLaunchUris("inDrive")[0], "indrive://open");
 });
 
 test("never uses non-exported ridepush or autostart routes", () => {
@@ -61,19 +61,17 @@ test("never uses non-exported ridepush or autostart routes", () => {
   assert.equal(uris.some((uri) => uri.includes("ridepush") || uri.includes("autostart")), false);
 });
 
-test("direct inDrive launch can fall back to geo", async () => {
+test("failed inDrive custom-scheme launch falls back to its official website", async () => {
   const attempted = [];
   const opened = await openFirstAvailable(
     getIndriveLaunchUris({ pickup: { lat: 31.5, lng: 74.3 } }),
     {
       canOpenURL: async (uri) => { attempted.push(uri); return true; },
-      openURL: async (uri) => {
-        if (uri === "indrive://open") throw new Error("app launch failed");
-      },
+      openURL: async (uri) => { if (uri === "indrive://open") throw new Error("app launch failed"); },
     },
   );
-  assert.equal(opened, "geo:31.5,74.3");
-  assert.deepEqual(attempted, ["indrive://open", "geo:31.5,74.3"]);
+  assert.equal(opened, "https://indrive.com/app");
+  assert.deepEqual(attempted, ["indrive://open", "https://indrive.com/app"]);
 });
 
 test("open fallback failure reaches the verified HTTPS app link", async () => {
@@ -88,11 +86,27 @@ test("open fallback failure reaches the verified HTTPS app link", async () => {
     },
   );
   assert.equal(opened, "https://indrive.com/app");
-  assert.deepEqual(attempted, ["indrive://open", "geo:31.5,74.3", "https://indrive.com/app"]);
+  assert.deepEqual(attempted, ["indrive://open", "https://indrive.com/app"]);
 });
 
 test("builds the documented Yango route link with encoded coordinates", () => {
-  assert.equal(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }), "https://yango.go.link/route?start-lat=31.5&start-lon=74.3&end-lat=31.6&end-lon=74.4");
+  const parsed = new URL(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }));
+  assert.equal(parsed.searchParams.get("start-lat"), "31.5");
+  assert.equal(parsed.searchParams.get("end-lon"), "74.4");
+  assert.equal(parsed.searchParams.get("adj_fallback"), "https://yango.com/en_pk/order/?gfrom=74.3%2C31.5&gto=74.4%2C31.6&ref=fairfare");
+});
+
+test("preserves the comparison pickup and destination ordering without rounding", () => {
+  const url = buildYangoRouteUrl({
+    pickup: { lat: "12.3456789", lng: "45.6789012" },
+    destination: { lat: "13.4567890", lng: "46.7890123" },
+  });
+  const parsed = new URL(url);
+  assert.equal(parsed.searchParams.get("start-lat"), "12.3456789");
+  assert.equal(parsed.searchParams.get("start-lon"), "45.6789012");
+  assert.equal(parsed.searchParams.get("end-lat"), "13.456789");
+  assert.equal(parsed.searchParams.get("end-lon"), "46.7890123");
+  assert.notEqual(parsed.searchParams.get("start-lat"), parsed.searchParams.get("end-lat"));
 });
 
 test("rejects invalid Yango coordinates and falls back to the official site", () => {
@@ -102,6 +116,8 @@ test("rejects invalid Yango coordinates and falls back to the official site", ()
 
 test("Bykea exposes the verified official app-link URL without route claims", () => {
   assert.deepEqual(getBykeaLaunchUris(), ["bykea://kl", "https://www.bykea.com/pk/"]);
+  assert.deepEqual(getProviderLaunchUris("bykea"), getBykeaLaunchUris());
+  assert.deepEqual(getProviderLaunchUris("urbancab"), getBykeaLaunchUris());
 });
 
 test("attempts openURL even when canOpenURL is false", async () => {

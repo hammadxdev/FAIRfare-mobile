@@ -6,10 +6,11 @@ import HomeScreen from "../screens/HomeScreen";
 import AIChatScreen from "../screens/AIChatScreen";
 import SettingsScreen from "../screens/SettingsRootScreen";
 import HistoryScreen from "../screens/HistoryScreen";
+import SavedRoutesScreen from "../screens/SavedRoutesScreen";
 import colors from "../constants/colors";
 
 const Tab = createBottomTabNavigator();
-const TAB_ICONS = { Home: "🏠", History: "🕘", "AI Chat": "✦", Settings: "⚙️" };
+const TAB_ICONS = { Home: "🏠", Saved: "🔖", History: "🕘", "AI Chat": "✦", Settings: "⚙️" };
 
 export default function TabNavigator() {
   const insets = useSafeAreaInsets();
@@ -39,6 +40,7 @@ export default function TabNavigator() {
     tabBarIcon: ({ focused }) => <Text style={{ fontSize: 20, lineHeight: Platform.OS === "android" ? 24 : 22, includeFontPadding: false, textAlign: "center", opacity: focused ? 1 : 0.5 }}>{TAB_ICONS[route.name] || "•"}</Text>,
   })}>
     <Tab.Screen name="Home" component={HomeScreen} />
+    <Tab.Screen name="Saved" component={SavedRoutesScreen} options={{ title: "Saved" }} />
     <Tab.Screen name="History" component={HistoryScreen} />
     <Tab.Screen name="AI Chat" component={AIChatScreen} />
     <Tab.Screen name="Settings" component={SettingsScreen} />

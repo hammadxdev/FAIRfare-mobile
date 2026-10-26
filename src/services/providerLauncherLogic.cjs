@@ -31,9 +31,18 @@ function buildYangoRouteUrl(tripContext = {}) {
   const startLon = getCanonicalCoordinate(pickup, "lng", "longitude");
   const endLat = getCanonicalCoordinate(destination, "lat", "latitude");
   const endLon = getCanonicalCoordinate(destination, "lng", "longitude");
+  const fallback = new URL("https://yango.com/en_pk/order/");
+  fallback.searchParams.set("gfrom", `${startLon},${startLat}`);
+  fallback.searchParams.set("gto", `${endLon},${endLat}`);
+  fallback.searchParams.set("ref", "fairfare");
   const params = new URLSearchParams({
     "start-lat": String(startLat), "start-lon": String(startLon),
     "end-lat": String(endLat), "end-lon": String(endLon),
+    ref: "fairfare",
+    adj_t: "vokme8e_nd9s9z9",
+    lang: "en",
+    adj_deeplink_js: "1",
+    adj_fallback: fallback.toString(),
   });
   return `https://yango.go.link/route?${params.toString()}`;
 }
@@ -49,17 +58,17 @@ function getBykeaLaunchUris() {
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
-  // The device resolves indrive://open directly to the inDrive client. Generic
-  // geo opens the Android chooser on this phone, so it is a lower-priority
-  // fallback and is not claimed to prefill pickup or destination.
-  const geoUri = buildGeoUri(tripContext.pickup);
-  return ["indrive://open", geoUri, "https://indrive.com/app"].filter(Boolean);
+  // Keep the app launch attempt and official website fallback. A generic geo:
+  // URI can resolve to a maps app, which is not an inDrive handoff.
+  void tripContext;
+  return ["indrive://open", "https://indrive.com/app"];
 }
 
 function getProviderLaunchUris(providerId, tripContext = {}) {
-  if (providerId === "indrive") return getIndriveLaunchUris(tripContext);
-  if (providerId === "quickride") return getYangoLaunchUris(tripContext);
-  if (providerId === "urbancab") return getBykeaLaunchUris();
+  const normalizedId = typeof providerId === "string" ? providerId.trim().toLowerCase() : "";
+  if (normalizedId === "indrive") return getIndriveLaunchUris(tripContext);
+  if (normalizedId === "quickride" || normalizedId === "yango") return getYangoLaunchUris(tripContext);
+  if (normalizedId === "urbancab" || normalizedId === "bykea") return getBykeaLaunchUris();
   return [];
 }
 

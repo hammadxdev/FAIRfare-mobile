@@ -8,9 +8,17 @@ export const DEFAULT_REGION = {
 const MIN_DELTA = 0.02;
 const PADDING_FACTOR = 1.8;
 
+function validPoint(location) {
+  const latitude = Number(location?.lat ?? location?.latitude);
+  const longitude = Number(location?.lng ?? location?.longitude);
+  return Number.isFinite(latitude) && Number.isFinite(longitude) && !(latitude === 0 && longitude === 0) && latitude >= -90 && latitude <= 90 && longitude >= -180 && longitude <= 180;
+}
+
 // Returns a region that frames pickup/dropoff (or a single point, or the
 // default Sialkot view when neither is set).
 export function getRegionForPoints(pickup, dropoff) {
+  pickup = validPoint(pickup) ? { lat: Number(pickup.lat ?? pickup.latitude), lng: Number(pickup.lng ?? pickup.longitude) } : null;
+  dropoff = validPoint(dropoff) ? { lat: Number(dropoff.lat ?? dropoff.latitude), lng: Number(dropoff.lng ?? dropoff.longitude) } : null;
   if (!pickup && !dropoff) {
     return DEFAULT_REGION;
   }

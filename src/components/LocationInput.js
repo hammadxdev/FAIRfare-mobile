@@ -8,25 +8,29 @@ import colors, { radius, spacing } from "../constants/colors";
 // forwards a ref to its input box so the parent can measure its on-screen
 // position to anchor that overlay, and reports focus/blur upward.
 const LocationInput = forwardRef(function LocationInput(
-  { label, placeholder, value, onChangeText, onFocus, onBlur, loading = false, dotColor = null },
+  { label, placeholder, value, secondaryValue = "", onChangeText, onFocus, onBlur, loading = false, dotColor = null, trailing = null, compact = false },
   ref
 ) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+    <View style={[styles.container, compact && styles.compactContainer]}>
+      <Text style={[styles.label, compact && styles.compactLabel]}>{label}</Text>
       <View style={styles.inputWrap} ref={ref}>
         {dotColor && <View style={[styles.dot, { backgroundColor: dotColor }]} />}
         <TextInput
-          style={[styles.input, dotColor && styles.inputWithDot]}
+          style={[styles.input, compact && styles.compactInput, dotColor && styles.inputWithDot]}
           placeholder={placeholder}
           placeholderTextColor={colors.muted}
           value={value}
+          accessibilityLabel={label}
+          accessibilityHint={label === "Pickup" ? "Enter or search for a pickup location" : "Enter or search for a drop-off location"}
           onChangeText={onChangeText}
           onFocus={onFocus}
           onBlur={onBlur}
         />
+        {trailing ? <View style={styles.trailing}>{trailing}</View> : null}
         {loading && <ActivityIndicator size="small" color={colors.accent} style={styles.spinner} />}
       </View>
+      {secondaryValue ? <Text style={[styles.secondary, compact && styles.compactSecondary]} numberOfLines={1}>{secondaryValue}</Text> : null}
     </View>
   );
 });
@@ -52,7 +56,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingRight: spacing.xl,
+    paddingRight: 52,
     paddingVertical: 14,
     fontSize: 15,
     color: colors.primary,
@@ -71,5 +75,34 @@ const styles = StyleSheet.create({
   spinner: {
     position: "absolute",
     right: spacing.md,
+  },
+  trailing: {
+    position: "absolute",
+    right: 2,
+    height: "100%",
+    justifyContent: "center",
+  },
+  secondary: {
+    color: colors.muted,
+    fontSize: 12,
+    lineHeight: 17,
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.xs,
+  },
+  compactContainer: {
+    marginBottom: spacing.sm,
+  },
+  compactLabel: {
+    fontSize: 11,
+    marginBottom: 2,
+  },
+  compactInput: {
+    borderRadius: radius.lg,
+    paddingVertical: 11,
+    fontSize: 14,
+  },
+  compactSecondary: {
+    fontSize: 11,
+    lineHeight: 14,
   },
 });

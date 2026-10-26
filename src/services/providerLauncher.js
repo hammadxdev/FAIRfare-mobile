@@ -5,8 +5,9 @@ const { getProviderLaunchUris, openFirstAvailable } = require("./providerLaunche
 // - indrive://open directly opens the client
 // - geo:<lat>,<lng> resolves but opens the Android chooser on the test phone
 // - https://indrive.com/app is an official fallback
-// NOT YET VERIFIED: simultaneous pickup + destination, category, fare, and
-// order creation. Fair Fare does not claim booking completion.
+// Route autofill is not verified for inDrive or Bykea, and Yango's route
+// candidate must still be confirmed in the provider UI. FareRide never claims
+// that opening a link created a booking.
 export const PROVIDER_LAUNCH_CONFIG = {
   indrive: { label: "inDrive", url: "https://indrive.com/app" },
   yango: { label: "Yango", url: "https://yango.com/en_pk/" },
@@ -36,7 +37,10 @@ export async function openProvider(providerId, tripContext = {}) {
     }
     : undefined;
 
-  if (await openFirstAvailable(launchUris, Linking, onEvent)) return true;
+  if (await openFirstAvailable(launchUris, Linking, onEvent)) {
+    Alert.alert("Provider link opened", "Confirm pickup, destination, and fare with the provider before booking. FairFare has not placed an order.");
+    return true;
+  }
 
   Alert.alert("Unable to open provider", `Unable to open ${label} right now.`);
   return false;
