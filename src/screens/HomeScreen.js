@@ -22,6 +22,8 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorState from "../components/ErrorState";
 import mockLocations, { ENABLE_MOCK_LOCATION_FALLBACK } from "../constants/mockLocations";
 import { compareFares, createSavedRoute, getProviderStatus } from "../services/api";
+import { fetchNearbyDrivers } from "../services/nearbyDrivers";
+const { nearbyRequestStore } = require("../utils/comparisonResults.cjs");
 import { autocompletePlaces, autocompleteDestination, getPlaceDetails, reverseGeocode, computeRoute } from "../services/maps.service";
 import { getCurrentLocation } from "../services/location.service";
 import { canCompareFares, hasValidCoordinates, isSameLocation } from "../utils/validators";
@@ -149,6 +151,7 @@ export default function HomeScreen({ navigation, route }) {
   const pickupRef = useRef(null);
   const dropoffRef = useRef(null);
   const pickupManuallySelectedRef = useRef(false);
+  const initialPickupLocationRequestedRef = useRef(false);
   const programmaticPickupQueryRef = useRef(null);
   const programmaticDropoffQueryRef = useRef(null);
   const routeCacheRef = useRef(new Map());
@@ -364,6 +367,7 @@ export default function HomeScreen({ navigation, route }) {
     pickupRequestIdRef.current += 1;
     pickupAbortRef.current?.abort();
     pickupSelectionRef.current += 1;
+    pickupManuallySelectedRef.current = true;
     setPickupQuery((current) => current === text ? current : text);
     setErrorMessage(null);
     if (pickup && text !== displayNameFor(pickup)) {
@@ -531,6 +535,7 @@ export default function HomeScreen({ navigation, route }) {
 
   const handleUseCurrentLocation = useCallback(async (field = "pickup") => {
     if (locatingRef.current) return;
+    if (field === "pickup") pickupManuallySelectedRef.current = false;
     locatingRef.current = true;
     setLocating(true);
     setErrorMessage(null);
@@ -581,9 +586,15 @@ export default function HomeScreen({ navigation, route }) {
     }
   }, []);
 
-  // One fresh foreground fix per Home mount. A late response cannot replace a
-  // pickup the user has already edited or selected.
-  // GPS is requested only from an explicit field action.
+  // Request a foreground fix when Home first opens. Restored routes and any
+  // user-edited/selected pickup take precedence over the asynchronous GPS fix.
+  useEffect(() => {
+    if (initialPickupLocationRequestedRef.current) return;
+    if (route?.params?.savedRoute || route?.params?.compareAgain) return;
+    initialPickupLocationRequestedRef.current = true;
+    if (pickupRef.current || pickupManuallySelectedRef.current) return;
+    void handleUseCurrentLocation("pickup");
+  }, [handleUseCurrentLocation, route?.params?.compareAgain, route?.params?.savedRoute]);
 
   // Tapping the map fills whichever field is active in the Pickup/Destination
   // toggle, using reverse geocoding to turn the tapped coordinate into a
@@ -871,6 +882,11 @@ export default function HomeScreen({ navigation, route }) {
       });
     }
 
+    const nearbyRequestKey = `${compareRequestId}:${Date.now()}`;
+    nearbyRequestStore.begin(nearbyRequestKey, { latitude: pickup.lat, longitude: pickup.lng });
+    void fetchNearbyDrivers(pickup, { signal: abortController.signal, onProviderResult: (providerId, records) => nearbyRequestStore.settle(nearbyRequestKey, providerId, records) })
+      .then((snapshot) => nearbyRequestStore.finish(nearbyRequestKey, snapshot))
+      .catch(() => nearbyRequestStore.finish(nearbyRequestKey, { pickup: { latitude: pickup.lat, longitude: pickup.lng } }));
     try {
       // The comparison request has its own bounded timeout; provider failures
       // are returned in the normalized response instead of fabricated here.
@@ -891,8 +907,9 @@ export default function HomeScreen({ navigation, route }) {
           quotes: quoteDiagnostics,
         });
       }
-      navigation.navigate("Results", { result: { ...response.data, quoteReceivedAt: Date.now() } });
+      navigation.navigate("Results", { result: { ...response.data, quoteReceivedAt: Date.now(), nearbyDrivers: nearbyRequestStore.get(nearbyRequestKey), nearbyRequestKey } });
     } catch (err) {
+      abortController.abort();
       if (compareRequestIdRef.current !== compareRequestId || routeRequestIdRef.current !== routeRequestId) return;
       if (isCanceledError(err)) return;
       if (IS_DEVELOPMENT) console.error("compareFares failed:", err?.message || err);

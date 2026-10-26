@@ -13,6 +13,7 @@ const {
 
 const context = fs.readFileSync(path.join(__dirname, "AuthContext.js"), "utf8");
 const api = fs.readFileSync(path.join(__dirname, "../services/api.js"), "utf8");
+const settings = fs.readFileSync(path.join(__dirname, "../screens/SettingsRootScreen.js"), "utf8");
 const navigator = fs.readFileSync(path.join(__dirname, "../navigation/RootNavigator.js"), "utf8");
 
 test("slow or unreachable startup is bounded without treating timeout as expiration", async () => {
@@ -64,4 +65,10 @@ test("API URL normalization appends exactly one /api and rejects malformed confi
   assert.throws(() => normalizeApiBaseUrl("ftp://example.test/api"));
   assert.match(api, /normalizeApiBaseUrl\(process\.env\.EXPO_PUBLIC_API_BASE_URL\)/);
   assert.match(navigator, /retrySession/);
+});
+
+test("session diagnostics are not exposed by the app settings or API client", () => {
+  assert.doesNotMatch(context, /sessionDiagnostics/);
+  assert.doesNotMatch(api, /getIndriveSessionDiagnostics|\/providers\/indrive\/status/);
+  assert.doesNotMatch(settings, /SESSION DIAGNOSTICS|sessionDiagnostics|indriveDiagnostics/);
 });

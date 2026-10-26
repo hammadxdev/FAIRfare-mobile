@@ -18,6 +18,13 @@ export async function getCurrentLocation() {
     throw new Error("Location permission was denied. Please enable location access to use this feature.");
   }
 
+  const servicesEnabled = await Location.hasServicesEnabledAsync();
+  if (!servicesEnabled) {
+    const error = new Error("Location services are turned off. Enable device location services and try again.");
+    error.code = "LOCATION_SERVICES_DISABLED";
+    throw error;
+  }
+
   const positionPromise = Location.getCurrentPositionAsync({
     accuracy: Location.Accuracy.Highest,
     mayShowUserSettingsDialog: true,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
@@ -10,6 +10,7 @@ const { buildComparisonRouteSnapshot } = require("../services/comparisonRouteSna
 const {
   flattenFareOptions,
   supportedCategories,
+  supportedServiceCategories,
   supportedFeatures,
   supportedServiceTiers,
   filterOptions,
@@ -17,8 +18,10 @@ const {
   providerStatusRows,
 } = require("../utils/fareComparison.cjs");
 
-const CATEGORY_LABELS = { bike: "Bike", car: "Car", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
-const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", rickshaw: "🛺", other: "🚕", unknown: "•" };
+const { SORT_OPTIONS, INDRIVE_SUGGESTED_FARE_LABEL, sortOptionsWithinCategories, fareSourceLabel, nearbyRequestStore, scheduleInDriveQuoteExpiry, scheduleNearbyFreshnessExpiry } = require("../utils/comparisonResults.cjs");
+
+const CATEGORY_LABELS = { bike: "Bike", car: "Car", mini: "Mini", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
+const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", mini: "🚕", rickshaw: "🛺", other: "🚕", unknown: "•" };
 
 function providerActionLabel(providerId) {
   if (providerId === "indrive") return "Open inDrive";
@@ -32,18 +35,39 @@ function safeErrorText(reason) {
   if (/token|secret|password|authorization|device|coordinate|latitude|longitude/i.test(reason)) return "Not available right now.";
   return reason.length > 80 ? `${reason.slice(0, 77)}…` : reason;
 }
-
 export default function ResultsScreen({ route, navigation }) {
   const insets = useSafeAreaInsets();
   const result = route.params?.result;
   const rawResults = result?.results || [];
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedOption, setSelectedOption] = useState(null);
+  const [sortMode, setSortMode] = useState("price");
+  const [sortMenuOpen, setSortMenuOpen] = useState(false);
+  const [nearbySnapshot, setNearbySnapshot] = useState(result?.nearbyDrivers || null);
+  const [quoteExpiryRevision, setQuoteExpiryRevision] = useState(0);
+  const [nearbyFreshnessRevision, setNearbyFreshnessRevision] = useState(0);
+  useEffect(() => {
+    const requestKey = result?.nearbyRequestKey;
+    if (!requestKey) { setNearbySnapshot(result?.nearbyDrivers || null); return undefined; }
+    setNearbySnapshot(nearbyRequestStore.get(requestKey) || result?.nearbyDrivers || null);
+    const unsubscribe = nearbyRequestStore.subscribe(requestKey, (snapshot) => setNearbySnapshot(snapshot));
+    return () => { unsubscribe(); nearbyRequestStore.clear(requestKey); };
+  }, [result?.nearbyRequestKey]);
   const options = useMemo(() => flattenFareOptions(rawResults), [rawResults]);
+  const categoryOptions = useMemo(() => filterOptions(options, selectedCategory), [options, selectedCategory]);
   const categories = useMemo(() => supportedCategories(options), [options]);
   const featureFilters = useMemo(() => supportedFeatures(options), [options]);
   const tierFilters = useMemo(() => supportedServiceTiers(options), [options]);
+  const serviceCategories = useMemo(() => supportedServiceCategories(options, [...featureFilters, ...tierFilters]), [options, featureFilters, tierFilters]);
   const bestIds = useMemo(() => bestComparableIds(options), [options]);
+  useEffect(() => scheduleInDriveQuoteExpiry(
+    categoryOptions,
+    () => setQuoteExpiryRevision((revision) => revision + 1),
+  ), [categoryOptions, quoteExpiryRevision]);
+  useEffect(() => scheduleNearbyFreshnessExpiry(
+    nearbySnapshot,
+    () => setNearbyFreshnessRevision((revision) => revision + 1),
+  ), [nearbySnapshot, selectedCategory, nearbyFreshnessRevision]);
 
   if (!result) {
     return <View style={styles.flex}><EmptyState icon="🔍" title="No comparison yet" message="Go back to Home and search for a ride to see fare comparisons here." /></View>;
@@ -51,7 +75,8 @@ export default function ResultsScreen({ route, navigation }) {
 
   const { pickup, dropoff, distanceKm, durationMin } = result;
   const comparisonRoute = buildComparisonRouteSnapshot(result);
-  const filtered = filterOptions(options, selectedCategory).sort((a, b) => (a.category === "unknown") - (b.category === "unknown") || a.fare - b.fare);
+  const filtered = sortOptionsWithinCategories(categoryOptions, sortMode, nearbySnapshot);
+  const actionOption = filtered.find((option) => option.optionId === selectedOption?.optionId) || filtered[0] || null;
   const statuses = providerStatusRows(rawResults).filter((status) => !status.available);
 
   const openOption = (option) => openProvider(option?.providerName || "", comparisonRoute || {});
@@ -74,13 +99,22 @@ export default function ResultsScreen({ route, navigation }) {
         </View>
 
         <ScrollView horizontal style={styles.chipScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
-          {["all", ...categories, ...featureFilters, ...tierFilters].map((category) => (
-            <Pressable key={category} accessibilityRole="button" accessibilityState={{ selected: selectedCategory === category }} onPress={() => setSelectedCategory(category)} style={[styles.chip, selectedCategory === category && styles.chipSelected]}>
-              <Text style={[styles.chipText, selectedCategory === category && styles.chipTextSelected]}>{category === "all" ? "All" : CATEGORY_LABELS[category]}</Text>
+          {[{ key: "all", label: "All" }, ...categories.map((category) => ({ key: category, label: CATEGORY_LABELS[category] || category })), ...serviceCategories, ...featureFilters.map((feature) => ({ key: feature, label: CATEGORY_LABELS[feature] || feature })), ...tierFilters.map((tier) => ({ key: tier, label: CATEGORY_LABELS[tier] || tier }))].map(({ key: category, label }) => (
+            <Pressable key={category} accessibilityRole="button" accessibilityState={{ selected: selectedCategory === category }} onPress={() => { setSelectedCategory(category); setSelectedOption(null); }} style={[styles.chip, selectedCategory === category && styles.chipSelected]}>
+              <Text style={[styles.chipText, selectedCategory === category && styles.chipTextSelected]}>{label}</Text>
             </Pressable>
           ))}
         </ScrollView>
 
+        <View style={styles.sortRow}>
+          <Text style={styles.sortLabel}>Sort</Text>
+          <View style={styles.sortControl}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Sort by ${SORT_OPTIONS.find((item) => item.value === sortMode)?.label}`} accessibilityState={{ expanded: sortMenuOpen }} onPress={() => setSortMenuOpen((open) => !open)} style={styles.sortButton}>
+              <Text style={styles.sortButtonText}>{SORT_OPTIONS.find((item) => item.value === sortMode)?.label || "Lowest Price"}⌄</Text>
+            </Pressable>
+            {sortMenuOpen ? <View style={styles.sortMenu}>{SORT_OPTIONS.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: sortMode === item.value }} onPress={() => { setSortMode(item.value); setSortMenuOpen(false); }} style={styles.sortMenuOption}><Text style={[styles.sortMenuText, sortMode === item.value && styles.sortMenuTextSelected]}>{item.label}</Text></Pressable>)}</View> : null}
+          </View>
+        </View>
         <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false}>
           {filtered.length === 0 ? <View style={styles.emptyResults}><Text style={styles.emptyTitle}>No comparable fares</Text><Text style={styles.emptyText}>Available estimates will appear here when providers respond.</Text></View> : null}
           {filtered.map((option) => (
@@ -89,8 +123,12 @@ export default function ResultsScreen({ route, navigation }) {
               <View style={styles.fareDetails}>
                 <View style={styles.fareTitleLine}><Text numberOfLines={1} style={styles.providerName}>{option.providerName}</Text>{bestIds.has(option.optionId) && selectedCategory !== "all" ? <Text style={styles.bestBadge}>BEST</Text> : null}</View>
                 <Text numberOfLines={1} style={styles.serviceLabel}>{option.serviceLabel}{option.category !== "unknown" ? ` · ${CATEGORY_LABELS[option.category]}` : ""}{option.features.includes("AC") ? " · AC" : ""}</Text>
+                {option.providerId === "indrive" ? <Text style={styles.indriveNotice}>{INDRIVE_SUGGESTED_FARE_LABEL}</Text> : null}
               </View>
-              <View style={styles.fareRight}><Text style={styles.fareAmount}>{option.currency === "PKR" ? formatPKR(option.fare) : `${option.currency || ""} ${option.fare}`}</Text><Text style={styles.estimateText}>{option.priceType === "suggested" || option.fareType === "RECOMMENDED" ? "Suggested" : "Live estimate"}</Text></View>
+              <View style={styles.fareRight}>
+                <Text style={styles.fareAmount}>{option.currency === "PKR" ? formatPKR(option.fare) : `${option.currency || ""} ${option.fare}`}</Text>
+                <Text style={styles.estimateText}>{fareSourceLabel(option)}</Text>
+              </View>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
@@ -101,8 +139,8 @@ export default function ResultsScreen({ route, navigation }) {
           <Text style={styles.disclaimer}>Estimates may change before booking.</Text>
         </ScrollView>
         <View style={styles.actionBar}>
-          <Pressable accessibilityRole="button" disabled={!selectedOption} onPress={() => openOption(selectedOption)} style={[styles.openButton, !selectedOption && styles.disabledButton]}>
-            <Text style={styles.openButtonText}>{selectedOption ? providerActionLabel(selectedOption.providerId) : "Select a ride"}</Text>
+          <Pressable accessibilityRole="button" disabled={!actionOption} onPress={() => openOption(actionOption)} style={[styles.openButton, !actionOption && styles.disabledButton]}>
+            <Text style={styles.openButtonText}>{actionOption ? providerActionLabel(actionOption.providerId) : "No ride available"}</Text>
           </Pressable>
         </View>
       </View>
@@ -132,6 +170,16 @@ const styles = StyleSheet.create({
   chipSelected: { backgroundColor: colors.primaryDark, borderColor: colors.primaryDark },
   chipText: { color: colors.primary, fontSize: 13, fontWeight: "700" },
   chipTextSelected: { color: colors.white },
+  sortRow: { minHeight: 38, flexDirection: "row", justifyContent: "flex-end", alignItems: "center", gap: spacing.xs, zIndex: 2 },
+  sortLabel: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
+  sortControl: { position: "relative", zIndex: 3 },
+  sortButton: { minHeight: 32, borderWidth: 1, borderColor: colors.outline, borderRadius: radius.full, backgroundColor: colors.surface, paddingHorizontal: spacing.sm, justifyContent: "center" },
+  sortButtonText: { color: colors.primary, fontSize: 11, fontWeight: "800" },
+  sortMenu: { position: "absolute", top: 34, right: 0, minWidth: 136, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outlineVariant, elevation: 5, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 8, zIndex: 5 },
+  sortMenuOption: { minHeight: 38, justifyContent: "center", paddingHorizontal: spacing.sm },
+  sortMenuText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
+  sortMenuTextSelected: { color: colors.forest },
+  indriveNotice: { color: colors.textSecondary, fontSize: 9, lineHeight: 12, marginTop: 3 },
   results: { flex: 1, minHeight: 0 },
   resultsContent: { paddingBottom: spacing.md, gap: spacing.sm },
   fareRow: { minHeight: 72, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outlineVariant, flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -142,7 +190,7 @@ const styles = StyleSheet.create({
   providerName: { flexShrink: 1, color: colors.primary, fontSize: 14, fontWeight: "800" },
   serviceLabel: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
   bestBadge: { color: colors.success, fontSize: 9, fontWeight: "900" },
-  fareRight: { alignItems: "flex-end", minWidth: 70 },
+  fareRight: { alignItems: "flex-end", minWidth: 112 },
   fareAmount: { color: colors.primary, fontSize: 15, fontWeight: "900" },
   estimateText: { color: colors.textSecondary, fontSize: 10, marginTop: 2 },
   chevron: { width: 24, textAlign: "center", color: colors.outline, fontSize: 26 },

@@ -76,7 +76,8 @@ test("ResultsScreen uses compact filters, one results scroll area, and row actio
   assert.match(results, /<ScrollView/);
   assert.match(results, /minHeight: 72/);
   assert.match(results, /selectedOption/);
-  assert.match(results, /Select a ride/);
+  assert.match(results, /No ride available/);
+  assert.match(results, /const actionOption = filtered\.find[\s\S]*?\|\| filtered\[0\]/);
   assert.doesNotMatch(results, /onOpenApp=\{handleOpenApp\}/);
 });
 

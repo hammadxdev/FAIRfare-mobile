@@ -1,4 +1,4 @@
-const CATEGORIES = Object.freeze(["bike", "car", "rickshaw", "other", "unknown"]);
+const CATEGORIES = Object.freeze(["bike", "car", "mini", "rickshaw", "other", "unknown"]);
 
 function providerIdFor(result) {
   const provider = result?.provider || {};
@@ -12,12 +12,12 @@ function providerNameFor(result) {
 
 function canonicalVehicleCategory(result = {}) {
   const explicit = String(result.vehicleCategory || result.normalizedCategory || "").trim().toLowerCase();
-  if (["bike", "car", "rickshaw", "other", "unknown"].includes(explicit)) return explicit;
-  if (explicit === "economy_car" || explicit === "standard_car" || explicit === "premium_car") return "car";
   const label = String(result.categoryName || result.name || "").trim().toLowerCase();
+  if (explicit === "mini" || label === "mini") return "mini";
+  if (["bike", "car", "mini", "rickshaw", "other", "unknown"].includes(explicit)) return explicit;
+  if (explicit === "economy_car" || explicit === "standard_car" || explicit === "premium_car") return "car";
   if (["moto", "bike", "motorcycle"].includes(label)) return "bike";
   if (label === "rickshaw") return "rickshaw";
-  if (providerIdFor(result) === "indrive" && ["mini", "ride ac", "premium"].includes(label)) return "car";
   return "unknown";
 }
 
@@ -88,6 +88,33 @@ function supportedCategories(options = []) {
   return CATEGORIES.filter((category) => category !== "unknown" && availableOptions(options).some((option) => option.category === category));
 }
 
+function serviceCategoryKey(label) {
+  const slug = String(label || "").trim().toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return slug ? `service:${slug}` : null;
+}
+
+function supportedServiceCategories(options = [], excludedLabels = []) {
+  const excluded = new Set(excludedLabels.map((label) => String(label).trim().toLowerCase()));
+  const seen = new Set();
+  return availableOptions(options).flatMap((option) => {
+    if (option.category === "unknown") return [];
+    const label = String(option.providerServiceName || option.serviceLabel || "").trim();
+    const normalized = label.toLowerCase();
+    const isPrimaryLabel = {
+      bike: ["bike", "moto", "motorcycle"],
+      car: ["car", "cars"],
+      mini: ["mini"],
+      rickshaw: ["rickshaw", "auto"],
+      other: ["other"],
+    }[option.category]?.includes(normalized);
+    if (!label || excluded.has(normalized) || isPrimaryLabel || hasFeature(option, "AC") || option.serviceTier === "premium") return [];
+    const key = serviceCategoryKey(label);
+    if (!key || seen.has(key)) return [];
+    seen.add(key);
+    return [{ key, label }];
+  });
+}
+
 function supportedFeatures(options = []) {
   return ["AC"].filter((feature) => availableOptions(options).some((option) => hasFeature(option, feature)));
 }
@@ -98,7 +125,10 @@ function supportedServiceTiers(options = []) {
 
 function filterOptions(options = [], filter) {
   if (!filter || filter === "all") return availableOptions(options);
-  if (["bike", "car", "rickshaw", "other", "unknown"].includes(filter)) return comparableOptions(options, filter);
+  if (String(filter).startsWith("service:")) {
+    return availableOptions(options).filter((option) => serviceCategoryKey(option.providerServiceName || option.serviceLabel) === filter);
+  }
+  if (["bike", "car", "mini", "rickshaw", "other", "unknown"].includes(filter)) return comparableOptions(options, filter);
   if (filter === "AC") return availableOptions(options).filter((option) => hasFeature(option, "AC"));
   if (["premium", "exclusive"].includes(filter)) return availableOptions(options).filter((option) => option.serviceTier === filter);
   return [];
@@ -137,6 +167,8 @@ module.exports = {
   flattenFareOptions,
   availableOptions,
   supportedCategories,
+  supportedServiceCategories,
+  serviceCategoryKey,
   supportedFeatures,
   supportedServiceTiers,
   filterOptions,

@@ -38,7 +38,7 @@ export async function openProvider(providerId, tripContext = {}) {
     : undefined;
 
   if (await openFirstAvailable(launchUris, Linking, onEvent)) {
-    Alert.alert("Confirm trip details", "Please confirm your pickup and destination in the provider app.");
+    Alert.alert("Provider link opened", "Confirm pickup, destination, and fare with the provider before booking. FairFare has not placed an order.");
     return true;
   }
 

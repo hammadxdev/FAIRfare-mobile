@@ -58,11 +58,10 @@ function getBykeaLaunchUris() {
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
-  // The device resolves indrive://open directly to the inDrive client. Generic
-  // geo opens the Android chooser on this phone, so it is a lower-priority
-  // fallback and is not claimed to prefill pickup or destination.
-  const geoUri = buildGeoUri(tripContext.pickup);
-  return ["indrive://open", geoUri, "https://indrive.com/app"].filter(Boolean);
+  // Keep the app launch attempt and official website fallback. A generic geo:
+  // URI can resolve to a maps app, which is not an inDrive handoff.
+  void tripContext;
+  return ["indrive://open", "https://indrive.com/app"];
 }
 
 function getProviderLaunchUris(providerId, tripContext = {}) {

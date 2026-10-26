@@ -3,6 +3,7 @@ import { createRefreshSingleFlight, isRefreshAuthFailure, normalizeApiBaseUrl } 
 import { annotateApiError, isRetryableRequest, retryAfterMs } from "./apiErrors.cjs";
 
 export const COMPARISON_TIMEOUT_MS = 30000;
+export const AI_CHAT_TIMEOUT_MS = 70000;
 
 // This is the only mobile API base URL. Expo inlines EXPO_PUBLIC_* variables
 // at bundle time; restart Expo after changing the value.
@@ -91,15 +92,10 @@ apiClient.interceptors.response.use((response) => response, async (error) => {
 });
 
 function authData(response) { return response.data.data; }
-export async function authLogin(email, password) { return authData(await apiClient.post("/auth/login", { email, password }, { skipAuth: true })); }
-export async function authRegister(name, email, password) { return authData(await apiClient.post("/auth/register", { name, email, password }, { skipAuth: true })); }
 export async function authRefresh(refreshToken, config = {}) { return authData(await apiClient.post("/auth/refresh", { refreshToken }, { ...config, skipAuth: true })); }
 export async function authLogout(refreshToken) { return apiClient.post("/auth/logout", { refreshToken }, { skipAuth: true }); }
-export async function sendVerificationEmail(email) { return authData(await apiClient.post("/auth/email/send-verification", { email }, { skipAuth: true })); }
-export async function verifyEmail(email, code) { return authData(await apiClient.post("/auth/email/verify", { email, code }, { skipAuth: true })); }
-export async function requestPasswordReset(email) { return authData(await apiClient.post("/auth/forgot-password", { email }, { skipAuth: true })); }
-export async function verifyPasswordReset(email, code) { return authData(await apiClient.post("/auth/forgot-password/verify", { email, code }, { skipAuth: true })); }
-export async function resetPassword(resetToken, newPassword, confirmPassword = newPassword) { return authData(await apiClient.post("/auth/reset-password", { resetToken, newPassword, confirmPassword }, { skipAuth: true })); }
+export async function requestEmailOtp(email) { return authData(await apiClient.post("/auth/email/otp/request", { email }, { skipAuth: true })); }
+export async function verifyEmailOtp(email, code) { return authData(await apiClient.post("/auth/email/otp/verify", { email, code }, { skipAuth: true })); }
 export async function authMe(config = {}) { return authData(await apiClient.get("/auth/me", config)); }
 export async function updateProfile(name) { return authData(await apiClient.patch("/auth/me", { name })); }
 export async function getPreferences() { return authData(await apiClient.get("/preferences")); }
@@ -118,10 +114,23 @@ export async function getProviders() {
   return response.data;
 }
 
+export async function getIndriveNearbyDrivers(latitude, longitude, config = {}) {
+  const response = await apiClient.get("/providers/indrive/drivers", { ...config, params: { latitude, longitude }, timeout: 12000 });
+  return response.data.data;
+}
+export async function getYangoNearbyDrivers(latitude, longitude, rideType, config = {}) {
+  const response = await apiClient.get("/providers/yango/drivers", { ...config, params: { latitude, longitude, ...(rideType ? { rideType } : {}) }, timeout: 12000 });
+  return response.data.data;
+}
+export async function getBykeaNearbyDrivers(latitude, longitude, serviceCode, config = {}) {
+  const response = await apiClient.get("/providers/bykea/drivers", { ...config, params: { latitude, longitude, ...(serviceCode ? { serviceCode } : {}) }, timeout: 12000 });
+  return response.data.data;
+}
 export async function getProviderStatus() {
   const response = await apiClient.get("/providers/status");
   return response.data;
 }
+
 
 export async function getHistory(id) {
   const response = await apiClient.get(id ? `/history/${id}` : "/history");
@@ -164,7 +173,7 @@ export async function renameAiConversation(id, title) { const response = await a
 export async function updateAiConversation(id, changes) { const response = await apiClient.patch(`/ai/conversations/${id}`, changes); return response.data; }
 export async function deleteAiConversation(id) { const response = await apiClient.delete(`/ai/conversations/${id}`); return response.data; }
 export async function askAi(message, comparisonId, conversationId, clientMessageId, config) {
-  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}), ...(clientMessageId ? { clientMessageId } : {}) }, config);
+  const response = await apiClient.post("/ai/chat", { message, ...(comparisonId ? { comparisonId } : {}), ...(conversationId ? { conversationId } : {}), ...(clientMessageId ? { clientMessageId } : {}) }, { ...config, timeout: AI_CHAT_TIMEOUT_MS });
   return response.data;
 }
 

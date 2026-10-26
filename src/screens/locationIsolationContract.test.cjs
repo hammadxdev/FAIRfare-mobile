@@ -6,10 +6,9 @@ const path = require("node:path");
 const source = fs.readFileSync(path.join(__dirname, "HomeScreen.js"), "utf8");
 const locationService = fs.readFileSync(path.join(__dirname, "../services/location.service.js"), "utf8");
 
-test("GPS handler applies only pickup and preserves drop-off", () => {
+test("GPS handler updates only the explicitly requested field and retains real coordinates", () => {
   const handler = source.slice(source.indexOf("const handleUseCurrentLocation"), source.indexOf("// Tapping the map"));
-  assert.match(handler, /applyPickup\(/);
-  assert.doesNotMatch(handler, /applyDropoff\(/);
+  assert.match(handler, /field === "destination" \? applyDropoff : applyPickup/);
   assert.match(handler, /lat: location\.lat/);
   assert.match(handler, /lng: location\.lng/);
 });
@@ -23,6 +22,16 @@ test("field-specific suggestion handlers remain independent", () => {
 test("current location control is explicitly pickup-only", () => {
   assert.match(source, /accessibilityLabel="Use current location for pickup"/);
   assert.doesNotMatch(source, /currentLocationButton/);
+});
+
+test("Home requests GPS once on entry and a user-edited pickup wins over a late fix", () => {
+  assert.match(source, /initialPickupLocationRequestedRef = useRef\(false\)/);
+  assert.match(source, /void handleUseCurrentLocation\("pickup"\)/);
+  assert.match(source, /if \(route\?\.params\?\.savedRoute \|\| route\?\.params\?\.compareAgain\) return/);
+  assert.match(source, /pickupManuallySelectedRef\.current = true/);
+  assert.match(source, /if \(field === "pickup" && pickupManuallySelectedRef\.current\) return/);
+  assert.match(locationService, /Location\.hasServicesEnabledAsync\(\)/);
+  assert.match(locationService, /LOCATION_SERVICES_DISABLED/);
 });
 
 test("GPS failure paths preserve explicit permission, timeout, and accuracy handling", () => {
