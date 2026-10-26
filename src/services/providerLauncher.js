@@ -2,12 +2,14 @@ import { Alert, Linking } from "react-native";
 const { getProviderLaunchUris, openFirstAvailable } = require("./providerLauncherLogic.cjs");
 
 // VERIFIED inDrive behavior from the installed Android app:
-// - indrive://open directly opens the client
+// - indrive://open/client/city with route coordinates opens the booking flow
+//   with pickup and destination prefilled
+// - indrive://open directly opens the client when route coordinates are absent
 // - geo:<lat>,<lng> resolves but opens the Android chooser on the test phone
 // - https://indrive.com/app is an official fallback
-// Route autofill is not verified for inDrive or Bykea, and Yango's route
-// candidate must still be confirmed in the provider UI. FareRide never claims
-// that opening a link created a booking.
+// The inDrive route handoff is verified; Yango's route candidate and all
+// provider handoffs must still be confirmed in the provider UI. FareRide never
+// claims that opening a link created a booking.
 export const PROVIDER_LAUNCH_CONFIG = {
   indrive: { label: "inDrive", url: "https://indrive.com/app" },
   yango: { label: "Yango", url: "https://yango.com/en_pk/" },

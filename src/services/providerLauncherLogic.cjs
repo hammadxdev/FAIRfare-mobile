@@ -47,6 +47,25 @@ function buildYangoRouteUrl(tripContext = {}) {
   return `https://yango.go.link/route?${params.toString()}`;
 }
 
+function buildIndriveRouteUrl(tripContext = {}) {
+  const pickup = tripContext.pickup || {};
+  const destination = tripContext.destination || tripContext.dropoff || {};
+  const params = [];
+
+  if (hasValidCoordinate(pickup)) {
+    params.push(`start_latitude=${getCanonicalCoordinate(pickup, "lat", "latitude")}`);
+    params.push(`start_longitude=${getCanonicalCoordinate(pickup, "lng", "longitude")}`);
+  }
+  if (hasValidCoordinate(destination)) {
+    params.push(`end_latitude=${getCanonicalCoordinate(destination, "lat", "latitude")}`);
+    params.push(`end_longitude=${getCanonicalCoordinate(destination, "lng", "longitude")}`);
+  }
+
+  return params.length > 0 && hasValidCoordinate(destination)
+    ? `indrive://open/client/city?${params.join("&")}`
+    : null;
+}
+
 function getYangoLaunchUris(tripContext = {}) {
   return [buildYangoRouteUrl(tripContext), "https://yango.com/en_pk/"].filter(Boolean);
 }
@@ -58,10 +77,9 @@ function getBykeaLaunchUris() {
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
-  // Keep the app launch attempt and official website fallback. A generic geo:
-  // URI can resolve to a maps app, which is not an inDrive handoff.
-  void tripContext;
-  return ["indrive://open", "https://indrive.com/app"];
+  // The route URI is inDrive's first-party booking deep link. Keep the base
+  // app URI as a safe fallback for contexts without a valid destination.
+  return [buildIndriveRouteUrl(tripContext), "indrive://open", "https://indrive.com/app"].filter(Boolean);
 }
 
 function getProviderLaunchUris(providerId, tripContext = {}) {
@@ -120,6 +138,7 @@ module.exports = {
   getYangoLaunchUris,
   getBykeaLaunchUris,
   getIndriveLaunchUris,
+  buildIndriveRouteUrl,
   getProviderLaunchUris,
   hasValidCoordinate,
   normalizeCoordinate,
