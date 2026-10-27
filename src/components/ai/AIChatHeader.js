@@ -35,7 +35,7 @@ export default function AIChatHeader({
       >
         <IconButton
           label="Open conversations"
-          icon="≡"
+          icon="☰"
           onPress={onOpenDrawer}
           testID="open-conversations"
         />
@@ -84,6 +84,9 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
     alignItems: "center",
     justifyContent: "center",
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
   },
   icon: {
     color: colors.primary,
@@ -92,7 +95,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   heading: { flex: 1, alignItems: "center", paddingHorizontal: spacing.sm },
-  title: { color: colors.primary, fontSize: 17, fontWeight: "800" },
+  title: { color: colors.primary, fontSize: 18, fontWeight: "900", letterSpacing: -0.2 },
   subtitle: { color: colors.muted, fontSize: 10, marginTop: 2 },
   contextChip: {
     flexDirection: "row",

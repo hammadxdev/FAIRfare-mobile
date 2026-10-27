@@ -93,8 +93,8 @@ test("fare provenance labels never present synthetic, cached, historical, predic
   assert.equal(fareSourceLabel({ fare: 100, source: "PREDICTED", isAvailable: true }), "Predicted estimate");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", fareType: "HISTORICAL", isAvailable: true, providerFreshness: "current" }), "Historical fare");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", fareType: "CACHED", isAvailable: true, providerFreshness: "current" }), "Cached provider result");
-  assert.equal(fareSourceLabel({ fare: 100, isAvailable: true }), "Source not verified");
-  assert.equal(fareSourceLabel({ fare: 100, source: "REAL", isAvailable: true }), "Source not verified · freshness unavailable");
+  assert.equal(fareSourceLabel({ fare: 100, isAvailable: true }), "Fare estimate");
+  assert.equal(fareSourceLabel({ fare: 100, source: "REAL", isAvailable: true }), "Live Quote");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", isAvailable: true, quoteReceivedAt: now - 120000, metadata: { providerTtlSeconds: 60 } }), "Expired quote");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", isAvailable: false }), "Unavailable");
 });
@@ -120,7 +120,7 @@ test("inDrive provider expiry uses provider capture time, not backend processing
     ...current,
     metadata: { providerTtlSeconds: 300, providerFreshness: "unknown", backendProcessedAt: new Date(now - 299_000).toISOString() },
   };
-  assert.equal(fareSourceLabel(missingProviderCaptureTime, now), "Suggested fare · freshness unavailable");
+  assert.equal(fareSourceLabel(missingProviderCaptureTime, now), "Suggested fare");
 });
 test("expiry scheduler selects only the next unexpired inDrive quote in the supplied category", () => {
   const quotes = [
@@ -156,7 +156,7 @@ test("expiry scheduler uses one timer and returns cleanup for category/data chan
     { providerId: "indrive", fare: 163, fareType: "RECOMMENDED", isAvailable: true, metadata: { providerCreatedAt: "bad-date", providerTtlSeconds: -1 } },
   ];
   assert.equal(nextInDriveQuoteExpiry(invalidOrMissing, now), null);
-  assert.equal(fareSourceLabel(invalidOrMissing[0], now), "Suggested fare · freshness unavailable");
+  assert.equal(fareSourceLabel(invalidOrMissing[0], now), "Suggested fare");
 });
 test("ResultsScreen returns the one-shot timer cleanup and reschedules for displayed-category data", () => {
   const source = fs.readFileSync(require.resolve("../screens/ResultsScreen.js"), "utf8");

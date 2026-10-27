@@ -9,6 +9,7 @@ function distanceLabel(item) {
 }
 
 function matchLabel(item) {
+  if (item.isHistory || item.matchStrength === "history") return "Recent location";
   if (item.matchStrength === "strong") return "Best match";
   if (item.matchStrength === "related") return "Related match";
   return "Partial match";
@@ -26,7 +27,7 @@ function suggestionKey(item, index, usedKeys) {
   return uniqueKey;
 }
 
-export default function LocationSuggestionList({ suggestions, onSelect }) {
+export default function LocationSuggestionList({ suggestions, onSelect, onRemove }) {
   const safeSuggestions = Array.isArray(suggestions) ? suggestions.filter(Boolean) : [];
   if (safeSuggestions.length === 0) return null;
   const usedKeys = new Set();
@@ -43,12 +44,17 @@ export default function LocationSuggestionList({ suggestions, onSelect }) {
             pressed && styles.itemPressed,
           ]}
         >
-          <Text style={styles.name} numberOfLines={1}>
-            {item.name || item.description || "Unnamed location"}
-          </Text>
-          <Text style={styles.address} numberOfLines={1}>
-            {[matchLabel(item), getLocationSecondaryText(item) || item.address, distanceLabel(item)].filter(Boolean).join(" · ")}
-          </Text>
+          <View style={styles.copy}>
+            <Text style={styles.name} numberOfLines={1}>{item.name || item.description || "Unnamed location"}</Text>
+            <Text style={styles.address} numberOfLines={1}>{[matchLabel(item), getLocationSecondaryText(item) || item.address, distanceLabel(item)].filter(Boolean).join(" · ")}</Text>
+          </View>
+          {item.isHistory && onRemove ? <Pressable
+            onPress={(event) => { event.stopPropagation?.(); onRemove(item); }}
+            hitSlop={8}
+            style={({ pressed }) => [styles.removeButton, pressed && styles.removeButtonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={`Remove ${item.name || "recent location"} from recents`}
+          ><Text style={styles.removeText}>×</Text></Pressable> : null}
         </Pressable>
       ))}
     </View>
@@ -58,6 +64,8 @@ export default function LocationSuggestionList({ suggestions, onSelect }) {
 const styles = StyleSheet.create({
   item: {
     backgroundColor: "#FFFFFF",
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 14,
     borderBottomWidth: 1,
@@ -69,6 +77,10 @@ const styles = StyleSheet.create({
   itemPressed: {
     backgroundColor: "#F1F5F9",
   },
+  copy: { flex: 1, minWidth: 0, paddingRight: 8 },
+  removeButton: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: "#F1F5F9" },
+  removeButtonPressed: { backgroundColor: "#FEE2E2" },
+  removeText: { color: colors.muted, fontSize: 23, lineHeight: 24, fontWeight: "500" },
   name: {
     fontSize: 14,
     fontWeight: "600",

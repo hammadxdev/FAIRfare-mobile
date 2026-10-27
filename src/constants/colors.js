@@ -24,6 +24,12 @@ const colors = {
   success: "#16A34A",
   dangerSoft: "#FEE2E2",
   dangerSurface: "#FFF7F7",
+  // Material 3-inspired semantic surfaces used by the mobile booking sheet.
+  surfaceContainerHigh: "#E8F0EA",
+  onSurface: "#18201A",
+  onSurfaceVariant: "#46534A",
+  primaryContainer: "#B7F1C6",
+  onPrimaryContainer: "#00210B",
 };
 
 export const radius = {

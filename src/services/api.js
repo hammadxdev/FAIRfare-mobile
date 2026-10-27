@@ -3,7 +3,7 @@ import { createRefreshSingleFlight, isRefreshAuthFailure, normalizeApiBaseUrl } 
 import { annotateApiError, isRetryableRequest, retryAfterMs } from "./apiErrors.cjs";
 
 export const COMPARISON_TIMEOUT_MS = 30000;
-export const AI_CHAT_TIMEOUT_MS = 70000;
+export const AI_CHAT_TIMEOUT_MS = 145000;
 
 // This is the only mobile API base URL. Expo inlines EXPO_PUBLIC_* variables
 // at bundle time; restart Expo after changing the value.
@@ -133,7 +133,7 @@ export async function getProviderStatus() {
 
 
 export async function getHistory(id) {
-  const response = await apiClient.get(id ? `/history/${id}` : "/history");
+  const response = await apiClient.get(id ? `/history/${id}` : "/history?limit=50");
   return response.data;
 }
 

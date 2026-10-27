@@ -148,7 +148,7 @@ function fareSourceLabel(option = {}, now = Date.now()) {
   const isLiveSource = ["REAL", "LIVE", "LIVE_PROVIDER", "PROVIDER_QUOTE"].includes(source);
   const isInDriveSuggested = canonicalProvider(option.providerId || option.provider?.name || option.provider?.id) === "indrive"
     && (["SUGGESTED", "NEGOTIABLE", "RECOMMENDED"].includes(type) || option.isNegotiable === true);
-  let label = "Source not verified";
+  let label = "Fare estimate";
   if (source.includes("SYNTHETIC")) label = "Synthetic estimate";
   else if (source.includes("HISTORICAL") || type.includes("HISTORICAL")) label = "Historical fare";
   else if (source.includes("CACHED") || type.includes("CACHED")) label = "Cached provider result";
@@ -180,11 +180,10 @@ function fareSourceLabel(option = {}, now = Date.now()) {
     return "Expired quote";
   }
   if (freshness === "unknown" || (ttlSeconds !== null && providerCreatedAt === null && providerExpiresAt === null && metadata.backendProcessedAt != null)) {
-    if (label === "Live Quote") return "Source not verified · freshness unavailable";
-    return `${label} · freshness unavailable`;
+    return label;
   }
   if ((label === "Live Quote" || (label === "Suggested fare" && isLiveSource && isInDriveSuggested)) && freshness !== "current") {
-    return isInDriveSuggested ? "Suggested fare · freshness unavailable" : "Source not verified · freshness unavailable";
+    return label;
   }
   if (isLiveSource && freshness === "current" && (label === "Live Quote" || (label === "Suggested fare" && isInDriveSuggested))) return "Live Quote";
   return label;
