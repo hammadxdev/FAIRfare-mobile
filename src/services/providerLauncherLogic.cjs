@@ -31,10 +31,9 @@ function buildYangoRouteUrl(tripContext = {}) {
   const startLon = getCanonicalCoordinate(pickup, "lng", "longitude");
   const endLat = getCanonicalCoordinate(destination, "lat", "latitude");
   const endLon = getCanonicalCoordinate(destination, "lng", "longitude");
-  const fallback = new URL("https://yango.com/en_pk/order/");
-  fallback.searchParams.set("gfrom", `${startLon},${startLat}`);
-  fallback.searchParams.set("gto", `${endLon},${endLat}`);
-  fallback.searchParams.set("ref", "fairfare");
+  // Keep the fallback coordinates unescaped here; URLSearchParams below
+  // encodes the nested URL exactly once for Yango's redirect service.
+  const fallback = `https://yango.com/en_pk/order/?gfrom=${startLon},${startLat}&gto=${endLon},${endLat}&ref=fairfare`;
   const params = new URLSearchParams({
     "start-lat": String(startLat), "start-lon": String(startLon),
     "end-lat": String(endLat), "end-lon": String(endLon),
@@ -67,19 +66,19 @@ function buildIndriveRouteUrl(tripContext = {}) {
 }
 
 function getYangoLaunchUris(tripContext = {}) {
-  return [buildYangoRouteUrl(tripContext), "https://yango.com/en_pk/"].filter(Boolean);
+  return [buildYangoRouteUrl(tripContext)].filter(Boolean);
 }
 
 function getBykeaLaunchUris() {
   // bykea://kl is verified to open the installed Bykea client. Route transfer
   // is intentionally not claimed; the official site remains the fallback.
-  return ["bykea://kl", "https://www.bykea.com/pk/"];
+  return ["bykea://kl"];
 }
 
 function getIndriveLaunchUris(tripContext = {}) {
   // The route URI is inDrive's first-party booking deep link. Keep the base
   // app URI as a safe fallback for contexts without a valid destination.
-  return [buildIndriveRouteUrl(tripContext), "indrive://open", "https://indrive.com/app"].filter(Boolean);
+  return [buildIndriveRouteUrl(tripContext), "indrive://open"].filter(Boolean);
 }
 
 function getProviderLaunchUris(providerId, tripContext = {}) {

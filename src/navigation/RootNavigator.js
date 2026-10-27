@@ -22,14 +22,14 @@ export default function RootNavigator() {
   if (isLoading) return <SplashScreen />;
   const needsName = isAuthenticated && !String(user?.name || "").trim();
   const appKey = needsName ? "profile-setup" : "fairfare-app";
-  return <><Stack.Navigator key={isAuthenticated ? appKey : "email-auth"} initialRouteName={isAuthenticated ? (needsName ? "NameSetup" : "MainTabs") : "Auth"} screenOptions={{ headerShown:false, contentStyle:{backgroundColor:colors.background} }}>
+  return <><Stack.Navigator key={isAuthenticated ? appKey : "email-auth"} initialRouteName={isAuthenticated ? (needsName ? "NameSetup" : "MainTabs") : "Auth"} screenOptions={{ headerShown:false, animation:"fade", contentStyle:{backgroundColor:colors.background}, headerShadowVisible:false, headerTintColor:colors.primary, headerTitleStyle:{fontSize:18,fontWeight:"900"}, headerBackTitle:"Back" }}>
     {!isAuthenticated ? <Stack.Screen name="Auth" component={LoginScreen} /> : needsName ? <Stack.Screen name="NameSetup" component={NameSetupScreen} /> : <Stack.Group navigationKey="fairfare-app">
       <Stack.Screen name="MainTabs" component={TabNavigator} />
       <Stack.Screen name="Results" component={ResultsScreen} options={{ headerShown: false }} />
-      <Stack.Screen name="HistoryDetail" component={HistoryDetailScreen} options={{headerShown:true,title:"Past comparison",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />
-      <Stack.Screen name="SavedRoutes" component={SavedRoutesScreen} options={{headerShown:true,title:"Saved Trips",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{headerShown:true,title:"Profile",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />
-      <Stack.Screen name="PreferenceEditor" component={PreferenceEditorScreen} options={({route})=>({headerShown:true,title:route.params?.mode==="preferred"?"Preferred vehicle":route.params?.mode==="avoided"?"Avoid vehicle types":route.params?.mode==="budget"?"Typical budget":"Ride priority",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary})} />
+      <Stack.Screen name="HistoryDetail" component={HistoryDetailScreen} options={{headerShown:true,title:"Past comparison",headerStyle:{backgroundColor:colors.surface}}} />
+      <Stack.Screen name="SavedRoutes" component={SavedRoutesScreen} options={{headerShown:true,title:"Saved Trips",headerStyle:{backgroundColor:colors.surface}}} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{headerShown:true,title:"Profile",headerStyle:{backgroundColor:colors.surface}}} />
+      <Stack.Screen name="PreferenceEditor" component={PreferenceEditorScreen} options={({route})=>({headerShown:true,title:route.params?.mode==="preferred"?"Preferred vehicle":route.params?.mode==="avoided"?"Avoid vehicle types":route.params?.mode==="budget"?"Typical budget":"Ride priority",headerStyle:{backgroundColor:colors.surface}})} />
       <Stack.Screen name="AboutFairFare" component={AboutScreen} options={{headerShown:true,title:"About FareFare",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />
       <Stack.Screen name="Terms" component={TermsScreen} options={{headerShown:true,title:"Terms & Conditions",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{headerShown:true,title:"Privacy Policy",headerStyle:{backgroundColor:colors.card},headerTintColor:colors.primary}} />

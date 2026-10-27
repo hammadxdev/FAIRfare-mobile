@@ -2,6 +2,8 @@ import React, { useState, useCallback, useMemo, useRef, useEffect } from "react"
 import {
   View,
   Text,
+  TextInput,
+  Modal,
   TouchableOpacity,
   KeyboardAvoidingView,
   Keyboard,
@@ -38,11 +40,16 @@ import { assessLocationFix } from "../utils/locationAccuracy.cjs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { collectWebLayoutDiagnostics } from "../utils/webLayoutDiagnostics.cjs";
 import { isCanceledError } from "../services/apiErrors.cjs";
+import * as SecureStore from "expo-secure-store";
+import ConfirmBottomSheet from "../components/ConfirmBottomSheet";
+import AppToast from "../components/AppToast";
 
 const MIN_AUTOCOMPLETE_LENGTH = 3;
 const AUTOCOMPLETE_DEBOUNCE_MS = 350;
 const DEFAULT_PRICING_VEHICLE_TYPE = "car";
 const IS_DEVELOPMENT = typeof __DEV__ !== "undefined" ? __DEV__ : process.env.NODE_ENV !== "production";
+const SEARCH_HISTORY_KEY = "fairfare.location-search-history.v1";
+const MAX_SEARCH_HISTORY = 8;
 
 // Mock-only fallback path, used only if ENABLE_MOCK_LOCATION_FALLBACK is
 // flipped on (e.g. offline demo) and the real backend call fails.
@@ -78,6 +85,13 @@ function displayNameFor(location) {
 
 function inputNameFor(location) {
   return getLocationDisplayText(location);
+}
+
+function locationHistoryKey(location) {
+  const lat = Number(location?.lat ?? location?.latitude);
+  const lng = Number(location?.lng ?? location?.longitude);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) return `${lat.toFixed(6)}|${lng.toFixed(6)}`;
+  return normalizeSearchText(`${location?.name || ""}|${location?.address || location?.description || ""}`);
 }
 
 function hasFullNameTokenMatch(item, query) {
@@ -142,6 +156,9 @@ export default function HomeScreen({ navigation, route }) {
   const [dropoffLoading, setDropoffLoading] = useState(false);
   const [dropoffStatus, setDropoffStatus] = useState(null);
   const [dropoffStatusType, setDropoffStatusType] = useState("empty");
+  const [searchHistory, setSearchHistory] = useState([]);
+  const [clearHistoryVisible, setClearHistoryVisible] = useState(false);
+  const [historyToast, setHistoryToast] = useState(null);
 
   const vehicleType = DEFAULT_PRICING_VEHICLE_TYPE;
   const [loading, setLoading] = useState(false);
@@ -159,6 +176,7 @@ export default function HomeScreen({ navigation, route }) {
   const compareRequestIdRef = useRef(0);
   const compareAbortRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [autoCompareRequested, setAutoCompareRequested] = useState(false);
 
   const [selectingMode, setSelectingMode] = useState("pickup");
   const [adjustMode, setAdjustMode] = useState("pickup");
@@ -169,6 +187,8 @@ export default function HomeScreen({ navigation, route }) {
   const [saveLoading, setSaveLoading] = useState(false);
   const [savedRouteKey, setSavedRouteKey] = useState(null);
   const [saveRouteError, setSaveRouteError] = useState(null);
+  const [saveName, setSaveName] = useState("");
+  const [saveNameVisible, setSaveNameVisible] = useState(false);
   const compareAgainHandledRef = useRef(null);
   const savedRouteHandledRef = useRef(null);
   const navigationRestoreSourceRef = useRef("none");
@@ -185,6 +205,7 @@ export default function HomeScreen({ navigation, route }) {
     setRouteInfo(null);
     applyPickup({ ...normalized.pickup, source });
     applyDropoff({ ...normalized.dropoff, source });
+    if (source === "compare-again" || source === "saved-route") setAutoCompareRequested(true);
   }
 
   useEffect(() => {
@@ -226,6 +247,57 @@ export default function HomeScreen({ navigation, route }) {
   // themselves stay mounted with stable identity while this surface updates.
   const [activeField, setActiveField] = useState(null);
 
+  useEffect(() => {
+    let cancelled = false;
+    SecureStore.getItemAsync(SEARCH_HISTORY_KEY).then((value) => {
+      if (cancelled || !value) return;
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const seen = new Set();
+          setSearchHistory(parsed.filter((item) => {
+            if (!isValidLocation(item)) return false;
+            const key = locationHistoryKey(item);
+            if (seen.has(key)) return false;
+            seen.add(key);
+            return true;
+          }).slice(0, MAX_SEARCH_HISTORY));
+        }
+      } catch (_) { /* ignore a corrupted local history */ }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  const rememberLocation = useCallback((location) => {
+    if (!isValidLocation(location) || location.source === "gps") return;
+    setSearchHistory((current) => {
+      const identity = locationHistoryKey(location);
+      const next = [location, ...current.filter((item) => locationHistoryKey(item) !== identity)].slice(0, MAX_SEARCH_HISTORY);
+      SecureStore.setItemAsync(SEARCH_HISTORY_KEY, JSON.stringify(next)).catch(() => {});
+      return next;
+    });
+  }, []);
+
+  const removeSearchHistoryItem = useCallback((location) => {
+    const identity = locationHistoryKey(location);
+    setSearchHistory((current) => {
+      const next = current.filter((item) => locationHistoryKey(item) !== identity);
+      SecureStore.setItemAsync(SEARCH_HISTORY_KEY, JSON.stringify(next)).catch(() => {});
+      setHistoryToast({ type: "success", message: "Recent location deleted" });
+      return next;
+    });
+  }, []);
+
+  const clearSearchHistory = useCallback(() => {
+    setSearchHistory([]);
+    SecureStore.deleteItemAsync(SEARCH_HISTORY_KEY).catch(() => {});
+    setHistoryToast({ type: "success", message: "Recent locations cleared" });
+  }, []);
+
+  const requestClearSearchHistory = useCallback(() => {
+    if (searchHistory.length) setClearHistoryVisible(true);
+  }, [searchHistory.length]);
+
   // Bumped on every keystroke that starts a new search and on every field
   // switch/clear, so a slow, now-superseded autocomplete response can never
   // overwrite newer results (or flip loading back off) after the fact.
@@ -243,6 +315,21 @@ export default function HomeScreen({ navigation, route }) {
     setSheetExpanded(true);
     setActiveField(field);
     setSelectingMode(field === "dropoff" ? "destination" : "pickup");
+  }
+
+  function handleSwapLocations() {
+    const nextPickup = dropoff;
+    const nextDropoff = pickup;
+    setPickup(nextPickup);
+    setDropoff(nextDropoff);
+    pickupRef.current = nextPickup;
+    dropoffRef.current = nextDropoff;
+    setPickupQuery(nextPickup ? inputNameFor(nextPickup) : "");
+    setDropoffQuery(nextDropoff ? inputNameFor(nextDropoff) : "");
+    setPickupSuggestions([]);
+    setDropoffSuggestions([]);
+    setActiveField(null);
+    setErrorMessage(null);
   }
 
   function nextSessionToken(ref) {
@@ -364,6 +451,10 @@ export default function HomeScreen({ navigation, route }) {
       programmaticPickupQueryRef.current = null;
       return;
     }
+    // Selecting a suggestion closes the overlay. If the user edits the same
+    // still-focused field afterwards, onFocus may not fire again, so restore
+    // ownership here before starting the next search.
+    setActiveField("pickup");
     pickupRequestIdRef.current += 1;
     pickupAbortRef.current?.abort();
     pickupSelectionRef.current += 1;
@@ -401,6 +492,7 @@ export default function HomeScreen({ navigation, route }) {
       programmaticDropoffQueryRef.current = null;
       return;
     }
+    setActiveField("dropoff");
     dropoffRequestIdRef.current += 1;
     dropoffAbortRef.current?.abort();
     dropoffSelectionRef.current += 1;
@@ -436,6 +528,7 @@ export default function HomeScreen({ navigation, route }) {
     if (!sameLocation) setPickup(location);
     pickupRef.current = location;
     if (location.source !== "gps") pickupManuallySelectedRef.current = true;
+    rememberLocation(location);
     programmaticPickupQueryRef.current = nextLabel;
     setPickupQuery((current) => current === nextLabel ? current : nextLabel);
     setPickupSuggestions([]);
@@ -456,6 +549,7 @@ export default function HomeScreen({ navigation, route }) {
     const sameLocation = dropoffRef.current && dropoffRef.current.lat === location.lat && dropoffRef.current.lng === location.lng && dropoffRef.current.name === location.name;
     if (!sameLocation) setDropoff(location);
     dropoffRef.current = location;
+    rememberLocation(location);
     programmaticDropoffQueryRef.current = nextLabel;
     setDropoffQuery((current) => current === nextLabel ? current : nextLabel);
     setDropoffSuggestions([]);
@@ -518,8 +612,17 @@ export default function HomeScreen({ navigation, route }) {
   }
 
   const activeQuery = activeField === "pickup" ? pickupQuery : activeField === "dropoff" ? dropoffQuery : "";
-  const activeSuggestions =
-    activeField === "pickup" ? pickupSuggestions : activeField === "dropoff" ? dropoffSuggestions : [];
+  const historySuggestions = useMemo(() => {
+    const query = normalizeSearchText(activeQuery);
+    return searchHistory
+      .filter((item) => !query || normalizeSearchText(`${item.name || ""} ${item.address || ""}`).includes(query))
+      .map((item) => ({ ...item, isHistory: true, matchStrength: "history" }));
+  }, [activeQuery, searchHistory]);
+  const activeSuggestions = [
+    ...historySuggestions,
+    ...(activeField === "pickup" ? pickupSuggestions : activeField === "dropoff" ? dropoffSuggestions : [])
+      .filter((item) => !searchHistory.some((saved) => locationHistoryKey(saved) === locationHistoryKey(item))),
+  ].filter((item, index, items) => items.findIndex((candidate) => locationHistoryKey(candidate) === locationHistoryKey(item)) === index);
   const activeLoading = activeField === "pickup" ? pickupLoading : activeField === "dropoff" ? dropoffLoading : false;
   const activeStatus = activeField === "pickup" ? pickupStatus : activeField === "dropoff" ? dropoffStatus : null;
   const activeStatusType =
@@ -531,7 +634,7 @@ export default function HomeScreen({ navigation, route }) {
   // cause of the flicker: there's a real gap between crossing the minimum
   // length and the debounced fetch actually settling, during which none of
   // loading/suggestions/status were true, so the dropdown flashed shut.
-  const shouldShowSuggestions = Boolean(activeField) && activeQuery.trim().length >= MIN_AUTOCOMPLETE_LENGTH;
+  const shouldShowSuggestions = Boolean(activeField) && (activeQuery.trim().length >= MIN_AUTOCOMPLETE_LENGTH || historySuggestions.length > 0);
 
   const handleUseCurrentLocation = useCallback(async (field = "pickup") => {
     if (locatingRef.current) return;
@@ -927,18 +1030,34 @@ export default function HomeScreen({ navigation, route }) {
     }
   };
 
+  useEffect(() => {
+    if (!autoCompareRequested || !canCompare || loading) return;
+    setAutoCompareRequested(false);
+    handleCompare();
+  }, [autoCompareRequested, canCompare, loading]);
+
   useEffect(() => () => {
     compareRequestIdRef.current += 1;
     compareAbortRef.current?.abort();
   }, []);
 
-  const handleSaveRoute = async () => {
+  const handleSaveRoute = () => {
     if (!canSaveRoute || savedRouteKey === currentRouteKey) return;
+    setSaveName(`${displayNameFor(pickup)} to ${displayNameFor(dropoff)}`.slice(0, 100));
+    setSaveRouteError(null);
+    setSaveNameVisible(true);
+  };
+
+  const submitSaveRoute = async () => {
+    if (!canSaveRoute || savedRouteKey === currentRouteKey) return;
+    const trimmedName = saveName.trim();
+    if (!trimmedName) { setSaveRouteError("Give this trip a name before saving."); return; }
     setSaveLoading(true);
     setSaveRouteError(null);
+    setSaveNameVisible(false);
     try {
       await createSavedRoute({
-        name: `${displayNameFor(pickup)} to ${displayNameFor(dropoff)}`.slice(0, 100),
+        name: trimmedName.slice(0, 100),
         labelType: "FAVORITE",
         pickup: { name: displayNameFor(pickup), address: pickup.address, latitude: pickup.lat, longitude: pickup.lng },
         destination: { name: displayNameFor(dropoff), address: dropoff.address, latitude: dropoff.lat, longitude: dropoff.lng },
@@ -949,6 +1068,8 @@ export default function HomeScreen({ navigation, route }) {
       const errorCode = error?.response?.data?.errorCode || error?.response?.data?.code;
       if (errorCode === "ALREADY_SAVED" || error?.response?.status === 409) {
         setSavedRouteKey(currentRouteKey);
+        setSaveRouteError("This route is already saved. Choose a different route to save it.");
+        setSaveNameVisible(true);
       } else if (error?.code === "SESSION_EXPIRED") {
         setSaveRouteError("Your session expired. Please sign in again.");
       } else {
@@ -1009,7 +1130,10 @@ export default function HomeScreen({ navigation, route }) {
               statusMessage={activeField === "pickup" ? activeStatus : null}
               statusType={activeField === "pickup" ? activeStatusType : "empty"}
               onSelect={handleOverlaySelect}
+              onRemoveHistory={removeSearchHistoryItem}
+              onClearHistory={requestClearSearchHistory}
               onRetry={retryActiveSearch}
+              historyVisible={activeField === "pickup" && activeQuery.trim().length < MIN_AUTOCOMPLETE_LENGTH}
             />
             {pickupAccuracyNotice && <Text style={styles.accuracyNotice}>{pickupAccuracyNotice}</Text>}
 
@@ -1025,6 +1149,9 @@ export default function HomeScreen({ navigation, route }) {
               dotColor={colors.navy}
               trailing={<TouchableOpacity accessibilityRole="button" accessibilityLabel="Use current location for destination" style={styles.gpsButton} onPress={() => handleUseCurrentLocation("destination")} disabled={locating}><Text style={styles.gpsIcon}>{locating ? "…" : "⌖"}</Text></TouchableOpacity>}
             />
+            <TouchableOpacity style={styles.swapButton} onPress={handleSwapLocations} disabled={!pickup && !dropoff} accessibilityRole="button" accessibilityLabel="Swap pickup and drop-off locations">
+              <Text style={styles.swapIcon}>⇅</Text><Text style={styles.swapText}>Swap locations</Text>
+            </TouchableOpacity>
             <SuggestionsOverlay
               visible={activeField === "dropoff" && shouldShowSuggestions}
               loading={activeField === "dropoff" && activeLoading}
@@ -1032,7 +1159,10 @@ export default function HomeScreen({ navigation, route }) {
               statusMessage={activeField === "dropoff" ? activeStatus : null}
               statusType={activeField === "dropoff" ? activeStatusType : "empty"}
               onSelect={handleOverlaySelect}
+              onRemoveHistory={removeSearchHistoryItem}
+              onClearHistory={requestClearSearchHistory}
               onRetry={retryActiveSearch}
+              historyVisible={activeField === "dropoff" && activeQuery.trim().length < MIN_AUTOCOMPLETE_LENGTH}
             />
 
             {sameLocationError && <Text style={styles.inlineError}>{sameLocationError}</Text>}
@@ -1083,6 +1213,19 @@ export default function HomeScreen({ navigation, route }) {
           onConfirm={handleConfirmAdjustedPickup}
         />
         <LoadingOverlay visible={loading} />
+        <Modal transparent visible={saveNameVisible} animationType="slide" onRequestClose={() => !saveLoading && setSaveNameVisible(false)}>
+          <View style={styles.saveNameBackdrop}><View style={styles.saveNameSheet}><View style={styles.sheetHandle} /><Text style={styles.saveNameTitle}>Name this saved trip</Text><Text style={styles.saveNameSubtitle}>Use a memorable name so you can find it quickly later.</Text><View style={styles.saveNameInputRow}><TextInput autoFocus value={saveName} onChangeText={setSaveName} maxLength={100} placeholder="e.g. Home to Office" placeholderTextColor={colors.muted} style={styles.saveNameInput} accessibilityLabel="Saved trip name" />{saveName ? <TouchableOpacity onPress={() => setSaveName("")} style={styles.clearSaveName} accessibilityRole="button" accessibilityLabel="Clear saved trip name"><Text style={styles.clearSaveNameText}>×</Text></TouchableOpacity> : null}</View><Text style={styles.saveNameRequired}>Name is required</Text><TouchableOpacity disabled={saveLoading || !saveName.trim()} onPress={submitSaveRoute} style={[styles.saveNameButton, (!saveName.trim() || saveLoading) && styles.saveNameButtonDisabled]}><Text style={styles.saveNameButtonText}>{saveLoading ? "Saving…" : "Save trip"}</Text></TouchableOpacity><TouchableOpacity disabled={saveLoading} onPress={() => setSaveNameVisible(false)} style={styles.saveNameCancel}><Text style={styles.saveNameCancelText}>Cancel</Text></TouchableOpacity></View></View>
+        </Modal>
+        <ConfirmBottomSheet
+          visible={clearHistoryVisible}
+          title="Clear recent locations?"
+          message="This removes your locally saved recent locations from this device. Saved trips and comparison history will not be affected."
+          confirmLabel="Clear recents"
+          destructive
+          onCancel={() => setClearHistoryVisible(false)}
+          onConfirm={() => { clearSearchHistory(); setClearHistoryVisible(false); }}
+        />
+        <AppToast visible={Boolean(historyToast)} message={historyToast?.message} type={historyToast?.type} onHide={() => setHistoryToast(null)} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -1111,6 +1254,9 @@ const styles = StyleSheet.create({
     borderColor: colors.outlineVariant,
     padding: spacing.sm,
   },
+  swapButton: { alignSelf: "flex-end", flexDirection: "row", alignItems: "center", minHeight: 36, paddingHorizontal: spacing.sm, marginTop: -spacing.xs, marginBottom: spacing.xs, borderRadius: radius.full, backgroundColor: colors.primarySoft },
+  swapIcon: { color: colors.forest, fontSize: 20, fontWeight: "800", marginRight: 5 },
+  swapText: { color: colors.forest, fontSize: 12, fontWeight: "800" },
   gpsButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   gpsIcon: { color: "#15803D", fontSize: 24, fontWeight: "700" },
   accuracyNotice: { color: colors.warning, fontSize: 12, fontWeight: "600", marginTop: -spacing.sm, marginBottom: spacing.sm },
@@ -1137,6 +1283,21 @@ const styles = StyleSheet.create({
   saveRouteText: { color: colors.forest, fontSize: 12, fontWeight: "800" },
   saveRouteTextSaved: { color: colors.success },
   saveRouteError: { color: colors.danger, fontSize: 12, fontWeight: "600", marginTop: spacing.sm },
+  saveNameBackdrop: { flex: 1, backgroundColor: "rgba(15,23,42,.48)", justifyContent: "flex-end" },
+  saveNameSheet: { backgroundColor: colors.surface, borderTopLeftRadius: radius.lg, borderTopRightRadius: radius.lg, padding: spacing.lg, paddingBottom: spacing.xl },
+  sheetHandle: { alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: colors.outlineVariant, marginBottom: spacing.lg },
+  saveNameTitle: { color: colors.primary, fontSize: 20, fontWeight: "900" },
+  saveNameSubtitle: { color: colors.textSecondary, fontSize: 13, lineHeight: 19, marginTop: spacing.sm },
+  saveNameInput: { flex: 1, minHeight: 54, borderWidth: 1, borderColor: colors.forest, borderRadius: radius.md, backgroundColor: colors.card, color: colors.primary, fontSize: 15, fontWeight: "700", paddingHorizontal: spacing.md },
+  saveNameInputRow: { flexDirection: "row", alignItems: "center", marginTop: spacing.lg },
+  clearSaveName: { width: 42, height: 42, borderRadius: 21, alignItems: "center", justifyContent: "center", marginLeft: -50, zIndex: 2, backgroundColor: colors.surfaceContainer },
+  clearSaveNameText: { color: colors.muted, fontSize: 24, lineHeight: 25 },
+  saveNameRequired: { color: colors.muted, fontSize: 11, marginTop: spacing.xs },
+  saveNameButton: { minHeight: 52, borderRadius: radius.md, backgroundColor: colors.forest, alignItems: "center", justifyContent: "center", marginTop: spacing.lg },
+  saveNameButtonDisabled: { opacity: .45 },
+  saveNameButtonText: { color: colors.white, fontSize: 15, fontWeight: "900" },
+  saveNameCancel: { minHeight: 46, alignItems: "center", justifyContent: "center" },
+  saveNameCancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: "800" },
   compareButton: { marginTop: spacing.sm, minHeight: 48, borderRadius: radius.full },
   compareHint: { color: colors.muted, fontSize: 11, textAlign: "center", marginTop: spacing.xs },
 });

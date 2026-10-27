@@ -1,10 +1,15 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import EmptyState from "../components/EmptyState";
 import colors, { radius, spacing } from "../constants/colors";
 import { formatPKR } from "../utils/formatCurrency";
 import { openProvider } from "../services/providerLauncher";
+import { compareFares } from "../services/api";
+import LoadingOverlay from "../components/LoadingOverlay";
+import AppAlert from "../components/AppAlert";
+import ConfidenceBadge from "../components/ConfidenceBadge";
+import { FareResultsSkeleton } from "../components/SkeletonBlock";
 
 const { buildComparisonRouteSnapshot } = require("../services/comparisonRouteSnapshot.cjs");
 const {
@@ -22,6 +27,7 @@ const { SORT_OPTIONS, INDRIVE_SUGGESTED_FARE_LABEL, sortOptionsWithinCategories,
 
 const CATEGORY_LABELS = { bike: "Bike", car: "Car", mini: "Mini", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
 const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", mini: "🚕", rickshaw: "🛺", other: "🚕", unknown: "•" };
+const MIN_REFRESH_INTERVAL_MS = 100000;
 
 function providerActionLabel(providerId) {
   if (providerId === "indrive") return "Open inDrive";
@@ -46,6 +52,8 @@ export default function ResultsScreen({ route, navigation }) {
   const [nearbySnapshot, setNearbySnapshot] = useState(result?.nearbyDrivers || null);
   const [quoteExpiryRevision, setQuoteExpiryRevision] = useState(0);
   const [nearbyFreshnessRevision, setNearbyFreshnessRevision] = useState(0);
+  const [refreshLoading, setRefreshLoading] = useState(false);
+  const [alertState, setAlertState] = useState(null);
   useEffect(() => {
     const requestKey = result?.nearbyRequestKey;
     if (!requestKey) { setNearbySnapshot(result?.nearbyDrivers || null); return undefined; }
@@ -78,9 +86,42 @@ export default function ResultsScreen({ route, navigation }) {
   const filtered = sortOptionsWithinCategories(categoryOptions, sortMode, nearbySnapshot);
   const actionOption = filtered.find((option) => option.optionId === selectedOption?.optionId) || filtered[0] || null;
   const statuses = providerStatusRows(rawResults).filter((status) => !status.available);
+  const hasIndriveSuggestedFare = options.some((option) => option.providerId === "indrive" && (["SUGGESTED", "NEGOTIABLE", "RECOMMENDED"].includes(String(option.priceType || option.fareType || option.metadata?.priceType || "").toUpperCase()) || option.isNegotiable === true));
+  const freshnessLabel = result.quoteReceivedAt ? `Updated ${new Date(result.quoteReceivedAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : "Freshness unavailable";
 
-  const openOption = (option) => openProvider(option?.providerName || "", comparisonRoute || {});
+  const openOption = (option) => openProvider(option?.providerId || option?.providerName || "", { ...(comparisonRoute || {}), comparisonId: result.comparisonId, onAlert: (title, message) => setAlertState({ title, message }) });
   const askAi = () => navigation.navigate("MainTabs", { screen: "AI Chat", params: { comparisonId: result.comparisonId, contextLabel: `${pickup?.name} → ${dropoff?.name}` } });
+
+  const refreshFares = async () => {
+    if (refreshLoading) return;
+    const lastFetchedAt = Number(result.quoteReceivedAt || result.updatedAt || result.createdAt || 0);
+    const elapsed = lastFetchedAt > 0 ? Date.now() - lastFetchedAt : MIN_REFRESH_INTERVAL_MS;
+    if (elapsed < MIN_REFRESH_INTERVAL_MS) {
+      const remainingSeconds = Math.ceil((MIN_REFRESH_INTERVAL_MS - elapsed) / 1000);
+      setAlertState({ title: "Fares already up to date", message: `Please wait ${remainingSeconds} seconds before refreshing prices again.` });
+      return;
+    }
+    const payload = {
+      pickup: result.pickup,
+      dropoff: result.dropoff,
+      vehicleType: result.vehicleType || "car",
+      route: {
+        distanceKm: result.distanceKm,
+        durationMin: result.durationMin,
+        requestId: result.route?.requestId || result.requestId,
+        compareFaresEligible: result.route?.compareFaresEligible !== false,
+      },
+    };
+    setRefreshLoading(true);
+    try {
+      const response = await compareFares(payload);
+      navigation.replace("Results", { result: { ...response.data, quoteReceivedAt: Date.now() } });
+    } catch (error) {
+      setAlertState({ title: "Refresh failed", message: error?.response?.data?.message || "Unable to refresh fares right now. Please try again." });
+    } finally {
+      setRefreshLoading(false);
+    }
+  };
 
   return (
     <SafeAreaView style={styles.flex} edges={["top", "bottom"]}>
@@ -96,7 +137,9 @@ export default function ResultsScreen({ route, navigation }) {
           <View style={styles.routeLine} />
           <View style={styles.locationRow}><View style={[styles.locationDot, { backgroundColor: colors.navy }]} /><Text numberOfLines={1} style={styles.locationText}>{dropoff?.name || "Destination"}</Text></View>
           <View style={styles.tripMeta}><Text style={styles.metaText}>{distanceKm} km</Text><Text style={styles.metaDivider}>•</Text><Text style={styles.metaText}>{durationMin} min</Text></View>
+          <View style={styles.freshnessRow}><ConfidenceBadge type={result.dataSource === "REAL" ? "verified" : "estimated"} /><Text style={styles.freshnessText}>{freshnessLabel}</Text></View>
         </View>
+        {hasIndriveSuggestedFare ? <View style={styles.indriveBanner}><Text style={styles.indriveBannerTitle}>Suggested inDrive price</Text><Text style={styles.indriveBannerText}>{INDRIVE_SUGGESTED_FARE_LABEL}</Text></View> : null}
 
         <ScrollView horizontal style={styles.chipScroller} showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {[{ key: "all", label: "All" }, ...categories.map((category) => ({ key: category, label: CATEGORY_LABELS[category] || category })), ...serviceCategories, ...featureFilters.map((feature) => ({ key: feature, label: CATEGORY_LABELS[feature] || feature })), ...tierFilters.map((tier) => ({ key: tier, label: CATEGORY_LABELS[tier] || tier }))].map(({ key: category, label }) => (
@@ -115,19 +158,20 @@ export default function ResultsScreen({ route, navigation }) {
             {sortMenuOpen ? <View style={styles.sortMenu}>{SORT_OPTIONS.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: sortMode === item.value }} onPress={() => { setSortMode(item.value); setSortMenuOpen(false); }} style={styles.sortMenuOption}><Text style={[styles.sortMenuText, sortMode === item.value && styles.sortMenuTextSelected]}>{item.label}</Text></Pressable>)}</View> : null}
           </View>
         </View>
-        <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false}>
-          {filtered.length === 0 ? <View style={styles.emptyResults}><Text style={styles.emptyTitle}>No comparable fares</Text><Text style={styles.emptyText}>Available estimates will appear here when providers respond.</Text></View> : null}
-          {filtered.map((option) => (
+        <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshLoading} onRefresh={refreshFares} tintColor={colors.forest} colors={[colors.forest]} title="Refreshing fares…" />}>
+          {refreshLoading ? <FareResultsSkeleton /> : null}
+          {!refreshLoading && filtered.length === 0 ? <View style={styles.emptyResults}><Text style={styles.emptyTitle}>No comparable fares</Text><Text style={styles.emptyText}>Available estimates will appear here when providers respond.</Text><ConfidenceBadge type="unavailable" label="Provider data unavailable" /></View> : null}
+          {!refreshLoading && filtered.map((option) => (
             <Pressable key={option.optionId} accessibilityRole="button" accessibilityState={{ selected: selectedOption?.optionId === option.optionId }} onPress={() => setSelectedOption(option)} style={[styles.fareRow, selectedOption?.optionId === option.optionId && styles.fareRowSelected]}>
               <Text style={styles.vehicleIcon}>{CATEGORY_ICONS[option.category] || CATEGORY_ICONS.unknown}</Text>
               <View style={styles.fareDetails}>
                 <View style={styles.fareTitleLine}><Text numberOfLines={1} style={styles.providerName}>{option.providerName}</Text>{bestIds.has(option.optionId) && selectedCategory !== "all" ? <Text style={styles.bestBadge}>BEST</Text> : null}</View>
                 <Text numberOfLines={1} style={styles.serviceLabel}>{option.serviceLabel}{option.category !== "unknown" ? ` · ${CATEGORY_LABELS[option.category]}` : ""}{option.features.includes("AC") ? " · AC" : ""}</Text>
-                {option.providerId === "indrive" ? <Text style={styles.indriveNotice}>{INDRIVE_SUGGESTED_FARE_LABEL}</Text> : null}
               </View>
               <View style={styles.fareRight}>
                 <Text style={styles.fareAmount}>{option.currency === "PKR" ? formatPKR(option.fare) : `${option.currency || ""} ${option.fare}`}</Text>
                 <Text style={styles.estimateText}>{fareSourceLabel(option)}</Text>
+                <ConfidenceBadge type={String(option.dataSource || option.sourceType || "").toUpperCase() === "REAL" ? "verified" : "estimated"} />
               </View>
               <Text style={styles.chevron}>›</Text>
             </Pressable>
@@ -144,6 +188,8 @@ export default function ResultsScreen({ route, navigation }) {
           </Pressable>
         </View>
       </View>
+      <LoadingOverlay visible={refreshLoading} />
+      <AppAlert visible={Boolean(alertState)} title={alertState?.title} message={alertState?.message} onClose={() => setAlertState(null)} />
     </SafeAreaView>
   );
 }
@@ -162,6 +208,8 @@ const styles = StyleSheet.create({
   locationText: { flex: 1, color: colors.primary, fontSize: 14, fontWeight: "600" },
   routeLine: { width: 1, height: 10, marginLeft: 4, backgroundColor: colors.outline },
   tripMeta: { flexDirection: "row", alignItems: "center", marginTop: spacing.sm },
+  freshnessRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm },
+  freshnessText: { color: colors.textSecondary, fontSize: 11, fontWeight: "700" },
   metaText: { color: colors.textSecondary, fontSize: 12, fontWeight: "700" },
   metaDivider: { color: colors.outline, marginHorizontal: spacing.sm },
   chipScroller: { flexGrow: 0, flexShrink: 0, height: 48 },
@@ -179,7 +227,9 @@ const styles = StyleSheet.create({
   sortMenuOption: { minHeight: 38, justifyContent: "center", paddingHorizontal: spacing.sm },
   sortMenuText: { color: colors.primary, fontSize: 12, fontWeight: "700" },
   sortMenuTextSelected: { color: colors.forest },
-  indriveNotice: { color: colors.textSecondary, fontSize: 9, lineHeight: 12, marginTop: 3 },
+  indriveBanner: { backgroundColor: colors.primaryContainer, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginTop: spacing.sm },
+  indriveBannerTitle: { color: colors.onPrimaryContainer, fontSize: 12, fontWeight: "900" },
+  indriveBannerText: { color: colors.onPrimaryContainer, fontSize: 11, lineHeight: 15, marginTop: 2 },
   results: { flex: 1, minHeight: 0 },
   resultsContent: { paddingBottom: spacing.md, gap: spacing.sm },
   fareRow: { minHeight: 72, padding: spacing.sm, borderRadius: radius.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.outlineVariant, flexDirection: "row", alignItems: "center", gap: spacing.sm },

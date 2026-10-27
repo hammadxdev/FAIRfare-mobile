@@ -6,15 +6,16 @@ import colors from "../constants/colors";
 // Inline by design: a native Modal/portal above the TextInput can cause
 // Android blur/focus churn whenever its contents update. This surface stays
 // in the search card, so results update without remounting the input.
-export default function SuggestionsOverlay({ visible, loading = false, suggestions = [], statusMessage = null, statusType = "empty", onSelect, onRetry }) {
+export default function SuggestionsOverlay({ visible, loading = false, suggestions = [], statusMessage = null, statusType = "empty", onSelect, onRetry, historyVisible = false, onRemoveHistory, onClearHistory }) {
   if (!visible) return null;
   const showSuggestions = suggestions.length > 0;
   const showStatus = !loading && Boolean(statusMessage) && (statusType === "error" || !showSuggestions);
 
   return (
     <View style={styles.dropdown} accessibilityLiveRegion="polite">
+      {historyVisible && showSuggestions ? <View style={styles.sectionHeader}><Text style={styles.sectionLabel}>RECENT LOCATIONS</Text><Pressable onPress={onClearHistory} disabled={!onClearHistory} style={({ pressed }) => [styles.clearButton, pressed && styles.clearButtonPressed]} accessibilityRole="button" accessibilityLabel="Clear recent locations"><Text style={styles.clearButtonText}>Clear all</Text></Pressable></View> : null}
       {loading ? <View style={styles.stateRow}><ActivityIndicator size="small" color={colors.accent} /><Text style={styles.loadingText}>{showSuggestions ? "Updating results…" : "Searching locations…"}</Text></View> : null}
-      {showSuggestions ? <ScrollView style={styles.scroll} nestedScrollEnabled keyboardShouldPersistTaps="always" keyboardDismissMode="none" showsVerticalScrollIndicator><LocationSuggestionList suggestions={suggestions} onSelect={onSelect} /></ScrollView> : null}
+      {showSuggestions ? <ScrollView style={styles.scroll} nestedScrollEnabled keyboardShouldPersistTaps="always" keyboardDismissMode="none" showsVerticalScrollIndicator><LocationSuggestionList suggestions={suggestions} onSelect={onSelect} onRemove={onRemoveHistory} /></ScrollView> : null}
       {showStatus ? <Pressable style={styles.stateRow} onPress={statusType === "error" ? onRetry : undefined} disabled={statusType !== "error" || !onRetry} accessibilityRole={statusType === "error" ? "button" : undefined} accessibilityLabel={statusType === "error" ? `${statusMessage}. Tap to retry` : statusMessage}><Text style={[styles.statusText, statusType === "error" ? styles.errorText : styles.emptyText]}>{statusMessage}</Text>{statusType === "error" && onRetry ? <Text style={styles.retryText}>Tap to retry</Text> : null}</Pressable> : null}
     </View>
   );
@@ -29,4 +30,9 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.muted },
   errorText: { color: colors.danger },
   retryText: { color: colors.primary, fontSize: 12, fontWeight: "800", marginTop: 6 },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingRight: 10 },
+  sectionLabel: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1, paddingLeft: 14, paddingTop: 12, paddingBottom: 6 },
+  clearButton: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 10 },
+  clearButtonPressed: { backgroundColor: "#F1F5F9" },
+  clearButtonText: { color: colors.danger, fontSize: 12, fontWeight: "800" },
 });

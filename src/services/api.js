@@ -133,7 +133,7 @@ export async function getProviderStatus() {
 
 
 export async function getHistory(id) {
-  const response = await apiClient.get(id ? `/history/${id}` : "/history");
+  const response = await apiClient.get(id ? `/history/${id}` : "/history?limit=50");
   return response.data;
 }
 
