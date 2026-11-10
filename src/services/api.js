@@ -280,7 +280,7 @@ export async function getProviderStatus() {
 
 export async function getHistory(id) {
   const response = await apiClient.get(
-    id ? `/history/${id}` : "/history?limit=50",
+    id ? `/history/${id}` : "/history?limit=50&summary=true",
   );
   return response.data;
 }

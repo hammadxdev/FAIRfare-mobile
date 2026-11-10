@@ -29,7 +29,24 @@ export default function HistoryScreen({ navigation }) {
   const [items, setItems] = React.useState([]); const [loading, setLoading] = React.useState(true); const [error, setError] = React.useState(null);
   const [redirectedProviders, setRedirectedProviders] = React.useState({});
   const [fromDate, setFromDate] = React.useState(""); const [toDate, setToDate] = React.useState(todayKey());
-  const load = React.useCallback(async () => { setLoading(true); try { const history = (await getHistory()).data || []; setItems(history); const entries = await Promise.all(history.map(async (item) => [String(item.comparisonId || item.id), await SecureStore.getItemAsync(`fairfare.provider-redirect.${item.comparisonId || item.id}`)])); setRedirectedProviders(Object.fromEntries(entries.filter(([, provider]) => provider))); setError(null); } catch { setError("We couldn't load your comparison history."); } finally { setLoading(false); } }, []);
+  const load = React.useCallback(async () => {
+    setLoading(true);
+    try {
+      const history = (await getHistory()).data || [];
+      setItems(history);
+      setError(null);
+      const settled = await Promise.allSettled(history.map(async (item) => [
+        String(item.comparisonId || item.id),
+        await SecureStore.getItemAsync(`fairfare.provider-redirect.${item.comparisonId || item.id}`),
+      ]));
+      const entries = settled.filter((result) => result.status === "fulfilled").map((result) => result.value);
+      setRedirectedProviders(Object.fromEntries(entries.filter(([, provider]) => provider)));
+    } catch {
+      setError("We couldn't load your comparison history.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
   React.useEffect(() => { load(); }, [load]);
   const openHome = (item) => navigation.getParent()?.navigate("MainTabs", { screen: "Home", params: { compareAgain: item } });
   const filteredItems = items.filter((item) => { const key = dateKey(item.searchedAt); if (!key) return false; return (!fromDate || key >= fromDate) && (!toDate || key <= toDate); });
