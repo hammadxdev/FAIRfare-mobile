@@ -28,6 +28,7 @@ const { SORT_OPTIONS, INDRIVE_SUGGESTED_FARE_LABEL, sortOptionsWithinCategories,
 const CATEGORY_LABELS = { bike: "Bike", car: "Car", mini: "Mini", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
 const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", mini: "🚕", rickshaw: "🛺", other: "🚕", unknown: "•" };
 const MIN_REFRESH_INTERVAL_MS = 100000;
+const AVAILABLE_SORT_OPTIONS = SORT_OPTIONS.filter((item) => item.value === "price");
 
 function providerActionLabel(providerId) {
   if (providerId === "indrive") return "Open inDrive";
@@ -139,10 +140,10 @@ export default function ResultsScreen({ route, navigation }) {
         <View style={styles.sortRow}>
           <Text style={styles.sortLabel}>Sort</Text>
           <View style={styles.sortControl}>
-            <Pressable accessibilityRole="button" accessibilityLabel={`Sort by ${SORT_OPTIONS.find((item) => item.value === sortMode)?.label}`} accessibilityState={{ expanded: sortMenuOpen }} onPress={() => setSortMenuOpen((open) => !open)} style={styles.sortButton}>
-              <Text style={styles.sortButtonText}>{SORT_OPTIONS.find((item) => item.value === sortMode)?.label || "Lowest Price"}⌄</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Sort by ${AVAILABLE_SORT_OPTIONS.find((item) => item.value === sortMode)?.label}`} accessibilityState={{ expanded: sortMenuOpen }} onPress={() => setSortMenuOpen((open) => !open)} style={styles.sortButton}>
+              <Text style={styles.sortButtonText}>{AVAILABLE_SORT_OPTIONS.find((item) => item.value === sortMode)?.label || "Lowest Price"}⌄</Text>
             </Pressable>
-            {sortMenuOpen ? <View style={styles.sortMenu}>{SORT_OPTIONS.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: sortMode === item.value }} onPress={() => { setSortMode(item.value); setSortMenuOpen(false); }} style={styles.sortMenuOption}><Text style={[styles.sortMenuText, sortMode === item.value && styles.sortMenuTextSelected]}>{item.label}</Text></Pressable>)}</View> : null}
+            {sortMenuOpen ? <View style={styles.sortMenu}>{AVAILABLE_SORT_OPTIONS.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: sortMode === item.value }} onPress={() => { setSortMode(item.value); setSortMenuOpen(false); }} style={styles.sortMenuOption}><Text style={[styles.sortMenuText, sortMode === item.value && styles.sortMenuTextSelected]}>{item.label}</Text></Pressable>)}</View> : null}
           </View>
         </View>
         <ScrollView style={styles.results} contentContainerStyle={styles.resultsContent} showsVerticalScrollIndicator={false} refreshControl={<RefreshControl refreshing={refreshLoading} onRefresh={refreshFares} tintColor={colors.forest} colors={[colors.forest]} title="Refreshing fares…" />}>
