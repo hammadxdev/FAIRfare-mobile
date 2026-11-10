@@ -157,7 +157,7 @@ test("Home keeps authenticated autocomplete, selected coordinates, route metrics
 
 test("Saved tab reuses the existing saved-route screen and restores trips without pricing", () => {
   assert.match(tabs, /<Tab\.Screen name="Saved" component=\{SavedRoutesScreen\}/);
-  assert.match(tabs, /Saved: "🔖"/);
+  assert.match(tabs, /Saved: "bookmark-outline"/);
   assert.match(savedRoutes, /getSavedRoutes/);
   assert.match(savedRoutes, /deleteSavedRoute/);
   assert.match(savedRoutes, /savedRoute: item/);
@@ -170,7 +170,8 @@ test("Results summary remains route-only and Home does not auto-price or price s
   assert.match(results, /distanceKm/);
   assert.match(results, /durationMin/);
   assert.doesNotMatch(results, /metaLabel\}>Vehicle/);
-  assert.doesNotMatch(results, /vehicleType/);
+  const tripSummary = results.slice(results.indexOf("<View style={styles.tripCard}>"), results.indexOf("</View>\n        {hasIndriveSuggestedFare"));
+  assert.doesNotMatch(tripSummary, /vehicleType/);
   assert.equal([...home.matchAll(/compareFares\(payload, \{ signal: abortController\.signal \}\)/g)].length, 1);
   assert.doesNotMatch(savedRoutes, /compareFares\(/);
 });

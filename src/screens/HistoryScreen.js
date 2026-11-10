@@ -35,11 +35,16 @@ export default function HistoryScreen({ navigation }) {
       const history = (await getHistory()).data || [];
       setItems(history);
       setError(null);
-      const settled = await Promise.allSettled(history.map(async (item) => [
-        String(item.comparisonId || item.id),
-        await SecureStore.getItemAsync(`fairfare.provider-redirect.${item.comparisonId || item.id}`),
-      ]));
-      const entries = settled.filter((result) => result.status === "fulfilled").map((result) => result.value);
+      const entries = [];
+      const secureStoreBatchSize = 8;
+      for (let index = 0; index < history.length; index += secureStoreBatchSize) {
+        const batch = history.slice(index, index + secureStoreBatchSize);
+        const settled = await Promise.allSettled(batch.map(async (item) => [
+          String(item.comparisonId || item.id),
+          await SecureStore.getItemAsync(`fairfare.provider-redirect.${item.comparisonId || item.id}`),
+        ]));
+        entries.push(...settled.filter((result) => result.status === "fulfilled").map((result) => result.value));
+      }
       setRedirectedProviders(Object.fromEntries(entries.filter(([, provider]) => provider)));
     } catch {
       setError("We couldn't load your comparison history.");

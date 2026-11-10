@@ -50,16 +50,15 @@ test("unknown category uses the generic bundled PNG fallback", () => {
   assert.match(source, /getIndriveVehicleImage/);
 });
 
-test("ResultsScreen expands provider quotes instead of hardcoding category count", () => {
+test("ResultsScreen flattens every provider quote instead of hardcoding category count", () => {
   const source = fs.readFileSync(path.join(__dirname, "../screens/ResultsScreen.js"), "utf8");
-  assert.match(source, /expandProviderResults\(results\)/);
-  assert.match(source, /liveInDriveResults\.map/);
+  assert.match(source, /flattenFareOptions\(rawResults\)/);
+  assert.match(source, /filtered\.map/);
   assert.doesNotMatch(source, /slice\(0,\s*5\)/);
 });
 
-test("ResultsScreen preserves inDrive-only expansion while Yango uses its separate adapter", () => {
+test("ResultsScreen uses one normalized adapter for all providers", () => {
   const source = fs.readFileSync(path.join(__dirname, "../screens/ResultsScreen.js"), "utf8");
-  assert.match(source, /expandProviderResults\(results\)/);
-  assert.match(source, /expandYangoResults\(results\)/);
-  assert.doesNotMatch(source, /expandYangoResults\(inDriveResults\)/);
+  assert.match(source, /flattenFareOptions\(rawResults\)/);
+  assert.doesNotMatch(source, /expandProviderResults\(results\)|expandYangoResults\(results\)/);
 });

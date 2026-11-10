@@ -37,7 +37,6 @@ test("does not build a geo URI when coordinates are missing", () => {
   assert.equal(hasValidCoordinate({ name: "Unknown" }), false);
   assert.deepEqual(getIndriveLaunchUris({ pickup: { name: "Unknown" } }), [
     "indrive://open",
-    "https://indrive.com/app",
   ]);
 });
 
@@ -106,7 +105,7 @@ test("builds the documented Yango route link with encoded coordinates", () => {
   const parsed = new URL(buildYangoRouteUrl({ pickup: { lat: 31.5, lng: 74.3 }, destination: { latitude: 31.6, longitude: 74.4 } }));
   assert.equal(parsed.searchParams.get("start-lat"), "31.5");
   assert.equal(parsed.searchParams.get("end-lon"), "74.4");
-  assert.equal(parsed.searchParams.get("adj_fallback"), "https://yango.com/en_pk/order/?gfrom=74.3%2C31.5&gto=74.4%2C31.6&ref=fairfare");
+  assert.equal(parsed.searchParams.get("adj_fallback"), "https://yango.com/en_pk/order/?gfrom=74.3,31.5&gto=74.4,31.6&ref=fairfare");
 });
 
 test("preserves the comparison pickup and destination ordering without rounding", () => {

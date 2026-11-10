@@ -94,7 +94,7 @@ test("fare provenance labels never present synthetic, cached, historical, predic
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", fareType: "HISTORICAL", isAvailable: true, providerFreshness: "current" }), "Historical fare");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", fareType: "CACHED", isAvailable: true, providerFreshness: "current" }), "Cached provider result");
   assert.equal(fareSourceLabel({ fare: 100, isAvailable: true }), "Fare estimate");
-  assert.equal(fareSourceLabel({ fare: 100, source: "REAL", isAvailable: true }), "Live Quote");
+  assert.equal(fareSourceLabel({ fare: 100, source: "REAL", isAvailable: true }), "Fare estimate");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", isAvailable: true, quoteReceivedAt: now - 120000, metadata: { providerTtlSeconds: 60 } }), "Expired quote");
   assert.equal(fareSourceLabel({ fare: 100, source: "LIVE", isAvailable: false }), "Unavailable");
 });

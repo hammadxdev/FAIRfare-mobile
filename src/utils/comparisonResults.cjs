@@ -180,10 +180,10 @@ function fareSourceLabel(option = {}, now = Date.now()) {
     return "Expired quote";
   }
   if (freshness === "unknown" || (ttlSeconds !== null && providerCreatedAt === null && providerExpiresAt === null && metadata.backendProcessedAt != null)) {
-    return label;
+    return label === "Live Quote" ? "Fare estimate" : label;
   }
   if ((label === "Live Quote" || (label === "Suggested fare" && isLiveSource && isInDriveSuggested)) && freshness !== "current") {
-    return label;
+    return label === "Live Quote" ? "Fare estimate" : label;
   }
   if (isLiveSource && freshness === "current" && (label === "Live Quote" || (label === "Suggested fare" && isInDriveSuggested))) return "Live Quote";
   return label;

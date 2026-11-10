@@ -22,11 +22,10 @@ test("stale responses cannot clear loading or navigate over a newer comparison",
   assert.match(source, /if \(compareRequestIdRef\.current === compareRequestId\) \{/);
 });
 
-test("successful fares navigate to Results without awaiting the independent nearby request", () => {
-  assert.match(source, /void fetchNearbyDrivers\(pickup/);
-  assert.doesNotMatch(source, /nearbyPromise/);
+test("successful fares navigate to Results without starting nearby-driver requests", () => {
+  assert.doesNotMatch(source, /fetchNearbyDrivers|nearbyRequestStore|nearbyPromise/);
   const fareResponse = source.indexOf("const response = await compareFares(payload");
   const resultsNavigation = source.indexOf('navigation.navigate("Results"');
   assert.ok(fareResponse >= 0 && resultsNavigation > fareResponse);
-  assert.match(source, /nearbyDrivers: nearbyRequestStore\.get\(nearbyRequestKey\)/);
+  assert.match(source, /quoteReceivedAt: Date\.now\(\)/);
 });

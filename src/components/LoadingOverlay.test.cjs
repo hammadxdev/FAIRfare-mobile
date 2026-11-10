@@ -17,12 +17,12 @@ test("comparison pending state keeps the dedicated compact loading treatment", (
 
 test("comparison resolution removes loading and navigates with real results", () => {
   assert.match(homeSource, /navigation\.navigate\("Results", \{ result: \{ \.\.\.response\.data, quoteReceivedAt: Date\.now\(\) \} \}\)/);
-  assert.match(homeSource, /finally \{\s*setLoading\(false\);\s*\}/);
+  assert.match(homeSource, /finally \{[\s\S]*?compareRequestIdRef\.current === compareRequestId[\s\S]*?setLoading\(false\)/);
 });
 
 test("comparison error path remains live-only", () => {
   assert.match(homeSource, /setErrorMessage\(/);
   assert.match(homeSource, /Unable to compare fares/);
-  assert.match(homeSource, /Live prices are currently unavailable/);
+  assert.match(homeSource, /Fare comparison timed out\. Please try again\./);
   assert.doesNotMatch(homeSource, /ENABLE_MOCK_FALLBACK/);
 });

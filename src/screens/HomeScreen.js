@@ -174,7 +174,6 @@ export default function HomeScreen({ navigation, route }) {
   const compareRequestIdRef = useRef(0);
   const compareAbortRef = useRef(null);
   const [errorMessage, setErrorMessage] = useState(null);
-  const [autoCompareRequested, setAutoCompareRequested] = useState(false);
 
   const [selectingMode, setSelectingMode] = useState("pickup");
   const [adjustMode, setAdjustMode] = useState("pickup");
@@ -203,7 +202,6 @@ export default function HomeScreen({ navigation, route }) {
     setRouteInfo(null);
     applyPickup({ ...normalized.pickup, source });
     applyDropoff({ ...normalized.dropoff, source });
-    if (source === "compare-again" || source === "saved-route") setAutoCompareRequested(true);
   }
 
   useEffect(() => {
@@ -1022,12 +1020,6 @@ export default function HomeScreen({ navigation, route }) {
       }
     }
   };
-
-  useEffect(() => {
-    if (!autoCompareRequested || !canCompare || loading) return;
-    setAutoCompareRequested(false);
-    handleCompare();
-  }, [autoCompareRequested, canCompare, loading]);
 
   useEffect(() => () => {
     compareRequestIdRef.current += 1;

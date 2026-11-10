@@ -58,7 +58,8 @@ test("Yango cards keep exact, display, starting, ETA, and availability semantics
 
 test("results keep the trip summary vehicle-free and render a unified comparison", () => {
   assert.doesNotMatch(results, /metaLabel\}>Vehicle/);
-  assert.doesNotMatch(results, /vehicleType/);
+  const tripSummary = results.slice(results.indexOf("<View style={styles.tripCard}>"), results.indexOf("</View>\n        {hasIndriveSuggestedFare"));
+  assert.doesNotMatch(tripSummary, /vehicleType/);
   assert.match(results, /Compare Fares/);
   assert.match(results, /flattenFareOptions/);
   assert.match(results, /Unavailable providers/);
