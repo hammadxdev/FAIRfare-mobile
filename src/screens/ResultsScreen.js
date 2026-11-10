@@ -23,7 +23,7 @@ const {
   providerStatusRows,
 } = require("../utils/fareComparison.cjs");
 
-const { SORT_OPTIONS, INDRIVE_SUGGESTED_FARE_LABEL, sortOptionsWithinCategories, fareSourceLabel, nearbyRequestStore, scheduleInDriveQuoteExpiry, scheduleNearbyFreshnessExpiry } = require("../utils/comparisonResults.cjs");
+const { SORT_OPTIONS, INDRIVE_SUGGESTED_FARE_LABEL, sortOptionsWithinCategories, fareSourceLabel, scheduleInDriveQuoteExpiry } = require("../utils/comparisonResults.cjs");
 
 const CATEGORY_LABELS = { bike: "Bike", car: "Car", mini: "Mini", rickshaw: "Rickshaw", other: "Other", AC: "AC", premium: "Premium", exclusive: "Exclusive" };
 const CATEGORY_ICONS = { bike: "🏍️", car: "🚗", mini: "🚕", rickshaw: "🛺", other: "🚕", unknown: "•" };
@@ -49,18 +49,9 @@ export default function ResultsScreen({ route, navigation }) {
   const [selectedOption, setSelectedOption] = useState(null);
   const [sortMode, setSortMode] = useState("price");
   const [sortMenuOpen, setSortMenuOpen] = useState(false);
-  const [nearbySnapshot, setNearbySnapshot] = useState(result?.nearbyDrivers || null);
   const [quoteExpiryRevision, setQuoteExpiryRevision] = useState(0);
-  const [nearbyFreshnessRevision, setNearbyFreshnessRevision] = useState(0);
   const [refreshLoading, setRefreshLoading] = useState(false);
   const [alertState, setAlertState] = useState(null);
-  useEffect(() => {
-    const requestKey = result?.nearbyRequestKey;
-    if (!requestKey) { setNearbySnapshot(result?.nearbyDrivers || null); return undefined; }
-    setNearbySnapshot(nearbyRequestStore.get(requestKey) || result?.nearbyDrivers || null);
-    const unsubscribe = nearbyRequestStore.subscribe(requestKey, (snapshot) => setNearbySnapshot(snapshot));
-    return () => { unsubscribe(); nearbyRequestStore.clear(requestKey); };
-  }, [result?.nearbyRequestKey]);
   const options = useMemo(() => flattenFareOptions(rawResults), [rawResults]);
   const categoryOptions = useMemo(() => filterOptions(options, selectedCategory), [options, selectedCategory]);
   const categories = useMemo(() => supportedCategories(options), [options]);
@@ -72,10 +63,6 @@ export default function ResultsScreen({ route, navigation }) {
     categoryOptions,
     () => setQuoteExpiryRevision((revision) => revision + 1),
   ), [categoryOptions, quoteExpiryRevision]);
-  useEffect(() => scheduleNearbyFreshnessExpiry(
-    nearbySnapshot,
-    () => setNearbyFreshnessRevision((revision) => revision + 1),
-  ), [nearbySnapshot, selectedCategory, nearbyFreshnessRevision]);
 
   if (!result) {
     return <View style={styles.flex}><EmptyState icon="🔍" title="No comparison yet" message="Go back to Home and search for a ride to see fare comparisons here." /></View>;
@@ -83,7 +70,7 @@ export default function ResultsScreen({ route, navigation }) {
 
   const { pickup, dropoff, distanceKm, durationMin } = result;
   const comparisonRoute = buildComparisonRouteSnapshot(result);
-  const filtered = sortOptionsWithinCategories(categoryOptions, sortMode, nearbySnapshot);
+  const filtered = sortOptionsWithinCategories(categoryOptions, sortMode, null);
   const actionOption = filtered.find((option) => option.optionId === selectedOption?.optionId) || filtered[0] || null;
   const statuses = providerStatusRows(rawResults).filter((status) => !status.available);
   const hasIndriveSuggestedFare = options.some((option) => option.providerId === "indrive" && (["SUGGESTED", "NEGOTIABLE", "RECOMMENDED"].includes(String(option.priceType || option.fareType || option.metadata?.priceType || "").toUpperCase()) || option.isNegotiable === true));

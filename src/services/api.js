@@ -17,16 +17,14 @@ export const AI_CHAT_TIMEOUT_MS = 145000;
 // at bundle time; restart Expo after changing the value.
 export const AUTH_RESTORE_TIMEOUT_MS = 8000;
 
-let API_BASE_URL;
+let API_BASE_URL = null;
+let API_CONFIGURATION_ERROR = null;
 try {
   API_BASE_URL = normalizeApiBaseUrl(process.env.EXPO_PUBLIC_API_BASE_URL);
 } catch (error) {
-  if (!process.env.EXPO_PUBLIC_API_BASE_URL?.trim()) {
-    throw new Error(
-      "[FairFare] EXPO_PUBLIC_API_BASE_URL is missing. Set it in mobile/.env.local to the backend URL, including /api.",
-    );
-  }
-  throw new Error(`[FairFare] ${error.message}`);
+  API_CONFIGURATION_ERROR = !process.env.EXPO_PUBLIC_API_BASE_URL?.trim()
+    ? "EXPO_PUBLIC_API_BASE_URL is missing. Set it to the backend URL, including /api."
+    : error.message;
 }
 
 const isDevelopment =
@@ -34,7 +32,7 @@ const isDevelopment =
     ? __DEV__
     : process.env.NODE_ENV !== "production";
 
-if (isDevelopment) {
+if (isDevelopment && API_BASE_URL) {
   console.info(`FairFare API: ${API_BASE_URL}`);
 }
 
@@ -84,6 +82,12 @@ const refreshOnce = createRefreshSingleFlight((options) =>
   authHandlers.refresh(options),
 );
 apiClient.interceptors.request.use(async (config) => {
+  if (API_CONFIGURATION_ERROR) {
+    const configurationError = new Error(`FairFare cannot connect to the server. ${API_CONFIGURATION_ERROR}`);
+    configurationError.code = "API_CONFIGURATION_ERROR";
+    configurationError.retryable = false;
+    throw configurationError;
+  }
   if (
     config._authDeadlineAt == null &&
     Number.isFinite(Number(config.authDeadlineMs))
