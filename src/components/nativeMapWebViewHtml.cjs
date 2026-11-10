@@ -35,7 +35,7 @@ html,body,#map{width:100%;height:100%;margin:0;padding:0;background:#e8f0e8;over
 .leaflet-marker-icon{background:transparent;border:0}
 ${diagnosticStage === "A" ? "html,body,#map{background:#ffeb3b!important}#map{box-sizing:border-box;border:6px solid #ff00ff}" : ""}
 ${diagnosticStage === "C" ? "#map{box-sizing:border-box;outline:4px solid #ff00ff;outline-offset:-4px}" : ""}
-</style></head><body><div id="map" aria-label="FareRide map"></div>
+</style></head><body><div id="map" aria-label="FairFare map"></div>
 ${diagnosticStage === "A" ? "" : `<script id="leaflet-js" src="${leafletJs}" onload="window.__fareRideLeafletJs='loaded'" onerror="window.__fareRideLeafletJs='failed'"></script>`}
 <script>
 (function(){
@@ -180,7 +180,7 @@ ${diagnosticStage === "A" ? "" : `<script id="leaflet-js" src="${leafletJs}" onl
   function init(){
     sendDiagnostic("document-loaded",dimensions());
     diagnostics.webViewLoaded=true;
-    if(STAGE==="A"){var label=document.createElement("div");label.textContent="FareRide WebView Stage A";label.style.cssText="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#000;font:900 28px system-ui";document.getElementById("map").appendChild(label);measureSnapshot();send("ready",{protocol:PROTOCOL,diagnostics:true,stage:STAGE});diagnostics.bridgeReady=true;sendSnapshot();return;}
+    if(STAGE==="A"){var label=document.createElement("div");label.textContent="FairFare WebView Stage A";label.style.cssText="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#000;font:900 28px system-ui";document.getElementById("map").appendChild(label);measureSnapshot();send("ready",{protocol:PROTOCOL,diagnostics:true,stage:STAGE});diagnostics.bridgeReady=true;sendSnapshot();return;}
     diagnostics.leafletJs=window.__fareRideLeafletJs==="loaded"||!!window.L?"loaded":"failed";
     diagnostics.leafletCss=window.__fareRideLeafletCss==="loaded"?"loaded":"failed";
     sendDiagnostic("leaflet-javascript",{status:diagnostics.leafletJs});

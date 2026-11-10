@@ -1,5 +1,15 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import colors, { radius, spacing } from "../constants/colors";
 import { getPreferences, updatePreferences } from "../services/api";
 import PreferenceOptionRow from "../components/settings/PreferenceOptionRow";
@@ -8,30 +18,487 @@ import SkeletonBlock from "../components/skeleton/SkeletonBlock";
 import ErrorState from "../components/ErrorState";
 import ConfidenceBadge from "../components/ConfidenceBadge";
 
-const VEHICLES = [["BIKE", "Bike"], ["RICKSHAW", "Rickshaw"], ["ECONOMY_CAR", "Economy Car"], ["STANDARD_CAR", "Standard Car"], ["PREMIUM_CAR", "Premium Car"], ["OTHER", "Other"]];
-const PRIORITIES = [["CHEAPEST", "CHEAPEST FARE", "Save money", "Prioritize lower fares"], ["FASTEST_PICKUP", "FASTEST SIMULATED PICKUP ESTIMATE (UNVERIFIED)", "Save time", "Prioritize a shorter simulated pickup estimate; live driver pickup times are not available"], ["BALANCED", "BALANCED", "Best balance", "Consider fare, simulated pickup estimate and preferences"]];
-const blank = { preferredVehicleType: null, avoidedVehicleTypes: [], typicalBudget: "", ridePriority: "BALANCED", currency: "PKR" };
-const labels = { preferred: ["Preferred vehicle", "Choose the ride type you usually prefer."], avoided: ["Avoid vehicle types", "Select ride types you generally don't want recommended."], budget: ["Typical budget", "FareRide can use your usual budget when personalizing ride recommendations."], priority: ["Ride priority", "What's most important when FareRide recommends a ride?"] };
+const VEHICLES = [
+  ["BIKE", "Bike"],
+  ["RICKSHAW", "Rickshaw"],
+  ["ECONOMY_CAR", "Economy Car"],
+  ["STANDARD_CAR", "Standard Car"],
+  ["PREMIUM_CAR", "Premium Car"],
+  ["OTHER", "Other"],
+];
+const PRIORITIES = [
+  ["CHEAPEST", "CHEAPEST FARE", "Save money", "Prioritize lower fares"],
+  [
+    "FASTEST_PICKUP",
+    "FASTEST SIMULATED PICKUP ESTIMATE (UNVERIFIED)",
+    "Save time",
+    "Prioritize a shorter simulated pickup estimate; live driver pickup times are not available",
+  ],
+  [
+    "BALANCED",
+    "BALANCED",
+    "Best balance",
+    "Consider fare, simulated pickup estimate and preferences",
+  ],
+];
+const blank = {
+  preferredVehicleType: null,
+  avoidedVehicleTypes: [],
+  typicalBudget: "",
+  ridePriority: "BALANCED",
+  currency: "PKR",
+};
+const labels = {
+  preferred: ["Preferred vehicle", "Choose the ride type you usually prefer."],
+  avoided: [
+    "Avoid vehicle types",
+    "Select ride types you generally don't want recommended.",
+  ],
+  budget: [
+    "Typical budget",
+    "FairFare can use your usual budget when personalizing ride recommendations.",
+  ],
+  priority: [
+    "Ride priority",
+    "What's most important when FairFare recommends a ride?",
+  ],
+};
 
 export default function PreferenceEditorScreen({ route, navigation }) {
-  const mode = route.params?.mode || "preferred"; const [prefs, setPrefs] = useState(null); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [feedback, setFeedback] = useState(null); const [loadError, setLoadError] = useState(null);
-  const load = useCallback(async () => { setLoading(true); setLoadError(null); try { const value = await getPreferences(); setPrefs({ ...blank, ...value, typicalBudget: value.typicalBudget == null ? "" : String(value.typicalBudget) }); } catch (err) { setLoadError(err.response?.data?.message || "Unable to load this preference."); } finally { setLoading(false); } }, []);
-  useEffect(() => { load(); }, [load]);
+  const mode = route.params?.mode || "preferred";
+  const [prefs, setPrefs] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [loadError, setLoadError] = useState(null);
+  const load = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const value = await getPreferences();
+      setPrefs({
+        ...blank,
+        ...value,
+        typicalBudget:
+          value.typicalBudget == null ? "" : String(value.typicalBudget),
+      });
+    } catch (err) {
+      setLoadError(
+        err.response?.data?.message || "Unable to load this preference.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
   const save = async () => {
     setFeedback(null);
-    if (mode === "budget" && prefs.typicalBudget.trim() !== "") { const amount = Number(prefs.typicalBudget); if (!Number.isFinite(amount) || amount <= 0) { setFeedback({ type: "error", text: "Enter a positive PKR amount, or clear the field." }); return; } }
-    if (prefs.preferredVehicleType && prefs.avoidedVehicleTypes.includes(prefs.preferredVehicleType)) { setFeedback({ type: "error", text: "Your preferred vehicle cannot also be in the avoided list." }); return; }
-    setSaving(true); try { const value = await updatePreferences({ ...prefs, typicalBudget: prefs.typicalBudget.trim() === "" ? null : Number(prefs.typicalBudget) }); setPrefs({ ...blank, ...value, typicalBudget: value.typicalBudget == null ? "" : String(value.typicalBudget) }); setFeedback({ type: "success", text: "Saved" }); } catch (err) { setFeedback({ type: "error", text: err.response?.data?.errors?.join(" ") || err.response?.data?.message || "Unable to save. Please try again." }); } finally { setSaving(false); }
+    if (mode === "budget" && prefs.typicalBudget.trim() !== "") {
+      const amount = Number(prefs.typicalBudget);
+      if (!Number.isFinite(amount) || amount <= 0) {
+        setFeedback({
+          type: "error",
+          text: "Enter a positive PKR amount, or clear the field.",
+        });
+        return;
+      }
+    }
+    if (
+      prefs.preferredVehicleType &&
+      prefs.avoidedVehicleTypes.includes(prefs.preferredVehicleType)
+    ) {
+      setFeedback({
+        type: "error",
+        text: "Your preferred vehicle cannot also be in the avoided list.",
+      });
+      return;
+    }
+    setSaving(true);
+    try {
+      const value = await updatePreferences({
+        ...prefs,
+        typicalBudget:
+          prefs.typicalBudget.trim() === ""
+            ? null
+            : Number(prefs.typicalBudget),
+      });
+      setPrefs({
+        ...blank,
+        ...value,
+        typicalBudget:
+          value.typicalBudget == null ? "" : String(value.typicalBudget),
+      });
+      setFeedback({ type: "success", text: "Saved" });
+    } catch (err) {
+      setFeedback({
+        type: "error",
+        text:
+          err.response?.data?.errors?.join(" ") ||
+          err.response?.data?.message ||
+          "Unable to save. Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
-  const toggleAvoid = (value) => setPrefs((current) => ({ ...current, avoidedVehicleTypes: current.avoidedVehicleTypes.includes(value) ? current.avoidedVehicleTypes.filter((item) => item !== value) : [...current.avoidedVehicleTypes, value] }));
+  const toggleAvoid = (value) =>
+    setPrefs((current) => ({
+      ...current,
+      avoidedVehicleTypes: current.avoidedVehicleTypes.includes(value)
+        ? current.avoidedVehicleTypes.filter((item) => item !== value)
+        : [...current.avoidedVehicleTypes, value],
+    }));
   const [title, subtitle] = labels[mode];
-  return <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"><View style={styles.titleRow}><View style={styles.titleCopy}><Text style={styles.eyebrow}>RIDE PREFERENCES</Text><Text style={styles.title}>{title}</Text><Text style={styles.subtitle}>{subtitle}</Text></View><ConfidenceBadge type="verified" label="Private" /></View>{loading ? <SkeletonCard><SkeletonBlock width="72%" height={17} /><SkeletonBlock width="52%" height={14} style={{ marginTop: spacing.md }} /><SkeletonBlock width="88%" height={48} borderRadius={radius.md} style={{ marginTop: spacing.lg }} /><SkeletonBlock width="60%" height={14} style={{ marginTop: spacing.md }} /></SkeletonCard> : loadError ? <ErrorState title="Preference unavailable" message={loadError} onRetry={load} /> : <>
-    {mode === "preferred" && <View style={styles.card}>{[[null, "No preference"], ...VEHICLES].map(([value, label]) => <PreferenceOptionRow key={label} label={label} selected={prefs.preferredVehicleType === value} onPress={() => setPrefs((current) => ({ ...current, preferredVehicleType: value }))}/>)}</View>}
-    {mode === "avoided" && <View style={styles.card}>{VEHICLES.map(([value, label]) => <TouchableOpacity key={value} style={[styles.option, prefs.avoidedVehicleTypes.includes(value) && styles.selected]} onPress={() => toggleAvoid(value)}><View style={[styles.checkbox, prefs.avoidedVehicleTypes.includes(value) && styles.checkboxSelected]}>{prefs.avoidedVehicleTypes.includes(value) ? <Text style={styles.check}>✓</Text> : null}</View><Text style={styles.optionText}>{label}</Text></TouchableOpacity>)}</View>}
-    {mode === "budget" && <><Text style={styles.optional}>Optional</Text><View style={styles.inputWrap}><Text style={styles.currency}>PKR</Text><TextInput value={prefs.typicalBudget} onChangeText={(value) => setPrefs((current) => ({ ...current, typicalBudget: value.replace(/[^0-9.]/g, "") }))} placeholder="Enter amount" placeholderTextColor={colors.muted} keyboardType="numeric" style={styles.input}/></View></>}
-    {mode === "priority" && <View>{PRIORITIES.map(([value, heading, line, detail]) => <TouchableOpacity key={value} style={[styles.priorityCard, prefs.ridePriority === value && styles.prioritySelected]} onPress={() => setPrefs((current) => ({ ...current, ridePriority: value }))}><Indicator selected={prefs.ridePriority === value}/><View style={styles.priorityCopy}><Text style={styles.priorityHeading}>{heading}</Text><Text style={styles.priorityLine}>{line}</Text><Text style={styles.priorityDetail}>{detail}</Text></View></TouchableOpacity>)}</View>}
-    {feedback ? <Text style={feedback.type === "error" ? styles.error : styles.success}>{feedback.text}</Text> : null}<View style={styles.actions}><TouchableOpacity style={styles.clear} onPress={() => setPrefs((current) => ({ ...current, typicalBudget: mode === "budget" ? "" : current.typicalBudget }))}><Text style={styles.clearText}>Clear</Text></TouchableOpacity><TouchableOpacity style={[styles.save, saving && styles.disabled]} onPress={save} disabled={saving}>{saving ? <ActivityIndicator color={colors.white}/> : <Text style={styles.saveText}>Save</Text>}</TouchableOpacity></View>
-  </>}</ScrollView></KeyboardAvoidingView>;
+  return (
+    <KeyboardAvoidingView
+      style={styles.flex}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.titleRow}>
+          <View style={styles.titleCopy}>
+            <Text style={styles.eyebrow}>RIDE PREFERENCES</Text>
+            <Text style={styles.title}>{title}</Text>
+            <Text style={styles.subtitle}>{subtitle}</Text>
+          </View>
+          <ConfidenceBadge type="verified" label="Private" />
+        </View>
+        {loading ? (
+          <SkeletonCard>
+            <SkeletonBlock width="72%" height={17} />
+            <SkeletonBlock
+              width="52%"
+              height={14}
+              style={{ marginTop: spacing.md }}
+            />
+            <SkeletonBlock
+              width="88%"
+              height={48}
+              borderRadius={radius.md}
+              style={{ marginTop: spacing.lg }}
+            />
+            <SkeletonBlock
+              width="60%"
+              height={14}
+              style={{ marginTop: spacing.md }}
+            />
+          </SkeletonCard>
+        ) : loadError ? (
+          <ErrorState
+            title="Preference unavailable"
+            message={loadError}
+            onRetry={load}
+          />
+        ) : (
+          <>
+            {mode === "preferred" && (
+              <View style={styles.card}>
+                {[[null, "No preference"], ...VEHICLES].map(
+                  ([value, label]) => (
+                    <PreferenceOptionRow
+                      key={label}
+                      label={label}
+                      selected={prefs.preferredVehicleType === value}
+                      onPress={() =>
+                        setPrefs((current) => ({
+                          ...current,
+                          preferredVehicleType: value,
+                        }))
+                      }
+                    />
+                  ),
+                )}
+              </View>
+            )}
+            {mode === "avoided" && (
+              <View style={styles.card}>
+                {VEHICLES.map(([value, label]) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.option,
+                      prefs.avoidedVehicleTypes.includes(value) &&
+                        styles.selected,
+                    ]}
+                    onPress={() => toggleAvoid(value)}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        prefs.avoidedVehicleTypes.includes(value) &&
+                          styles.checkboxSelected,
+                      ]}
+                    >
+                      {prefs.avoidedVehicleTypes.includes(value) ? (
+                        <Text style={styles.check}>✓</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.optionText}>{label}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {mode === "budget" && (
+              <>
+                <Text style={styles.optional}>Optional</Text>
+                <View style={styles.inputWrap}>
+                  <Text style={styles.currency}>PKR</Text>
+                  <TextInput
+                    value={prefs.typicalBudget}
+                    onChangeText={(value) =>
+                      setPrefs((current) => ({
+                        ...current,
+                        typicalBudget: value.replace(/[^0-9.]/g, ""),
+                      }))
+                    }
+                    placeholder="Enter amount"
+                    placeholderTextColor={colors.muted}
+                    keyboardType="numeric"
+                    style={styles.input}
+                  />
+                </View>
+              </>
+            )}
+            {mode === "priority" && (
+              <View>
+                {PRIORITIES.map(([value, heading, line, detail]) => (
+                  <TouchableOpacity
+                    key={value}
+                    style={[
+                      styles.priorityCard,
+                      prefs.ridePriority === value && styles.prioritySelected,
+                    ]}
+                    onPress={() =>
+                      setPrefs((current) => ({
+                        ...current,
+                        ridePriority: value,
+                      }))
+                    }
+                  >
+                    <Indicator selected={prefs.ridePriority === value} />
+                    <View style={styles.priorityCopy}>
+                      <Text style={styles.priorityHeading}>{heading}</Text>
+                      <Text style={styles.priorityLine}>{line}</Text>
+                      <Text style={styles.priorityDetail}>{detail}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+            {feedback ? (
+              <Text
+                style={
+                  feedback.type === "error" ? styles.error : styles.success
+                }
+              >
+                {feedback.text}
+              </Text>
+            ) : null}
+            <View style={styles.actions}>
+              <TouchableOpacity
+                style={styles.clear}
+                onPress={() =>
+                  setPrefs((current) => ({
+                    ...current,
+                    typicalBudget:
+                      mode === "budget" ? "" : current.typicalBudget,
+                  }))
+                }
+              >
+                <Text style={styles.clearText}>Clear</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.save, saving && styles.disabled]}
+                onPress={save}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color={colors.white} />
+                ) : (
+                  <Text style={styles.saveText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
 }
-function Indicator({ selected }) { return <View style={[styles.radio, selected && styles.radioSelected]}>{selected ? <View style={styles.radioDot}/> : null}</View>; }
-const styles = StyleSheet.create({ flex:{flex:1,backgroundColor:colors.background}, content:{padding:spacing.lg,paddingBottom:spacing.xl*2}, titleRow:{flexDirection:"row",alignItems:"flex-start",gap:spacing.sm,marginBottom:spacing.lg}, titleCopy:{flex:1}, eyebrow:{color:colors.forest,fontSize:10,fontWeight:"900",letterSpacing:1,marginBottom:spacing.sm}, title:{fontSize:25,fontWeight:"900",color:colors.primary}, subtitle:{color:colors.muted,fontSize:14,lineHeight:21,marginTop:spacing.sm}, loader:{marginTop:spacing.xl}, card:{backgroundColor:colors.card,borderWidth:1,borderColor:colors.outlineVariant,borderRadius:radius.lg,paddingHorizontal:spacing.md,shadowColor:"#0F172A",shadowOpacity:.06,shadowRadius:12,shadowOffset:{width:0,height:5},elevation:2}, option:{minHeight:64,flexDirection:"row",alignItems:"center",borderBottomWidth:1,borderBottomColor:colors.border,paddingVertical:spacing.sm,paddingHorizontal:spacing.sm}, selected:{backgroundColor:colors.softGreen}, optionText:{color:colors.primary,fontSize:15,fontWeight:"700",marginLeft:spacing.md}, radio:{width:24,height:24,borderRadius:radius.full,borderWidth:2,borderColor:colors.border,alignItems:"center",justifyContent:"center"}, radioSelected:{borderColor:colors.accent}, radioDot:{width:10,height:10,borderRadius:radius.full,backgroundColor:colors.accent}, checkbox:{width:24,height:24,borderRadius:7,borderWidth:2,borderColor:colors.border,alignItems:"center",justifyContent:"center"}, checkboxSelected:{backgroundColor:colors.accent,borderColor:colors.accent}, check:{color:colors.white,fontWeight:"800",fontSize:15}, optional:{color:colors.muted,fontSize:13,fontWeight:"700",marginBottom:spacing.sm}, inputWrap:{height:58,backgroundColor:colors.card,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,flexDirection:"row",alignItems:"center",paddingHorizontal:spacing.md}, currency:{color:colors.forest,fontWeight:"800",fontSize:15,paddingRight:spacing.sm,borderRightWidth:1,borderRightColor:colors.border}, input:{flex:1,color:colors.primary,fontSize:16,paddingLeft:spacing.md}, priorityCard:{backgroundColor:colors.card,borderWidth:1,borderColor:colors.border,borderRadius:radius.lg,padding:spacing.md,flexDirection:"row",marginBottom:spacing.sm}, prioritySelected:{backgroundColor:colors.softGreen,borderColor:colors.accent}, priorityCopy:{flex:1,marginLeft:spacing.md}, priorityHeading:{color:colors.forest,fontSize:12,fontWeight:"900",letterSpacing:1}, priorityLine:{color:colors.primary,fontSize:16,fontWeight:"800",marginTop:4}, priorityDetail:{color:colors.muted,fontSize:13,marginTop:3}, error:{color:colors.danger,lineHeight:19,marginTop:spacing.md}, success:{color:colors.success,fontWeight:"700",marginTop:spacing.md}, actions:{flexDirection:"row",gap:spacing.sm,marginTop:spacing.lg}, clear:{flex:1,borderWidth:1,borderColor:colors.border,borderRadius:radius.md,minHeight:52,alignItems:"center",justifyContent:"center",backgroundColor:colors.card}, clearText:{color:colors.muted,fontWeight:"800"}, save:{flex:1,borderRadius:radius.md,minHeight:52,alignItems:"center",justifyContent:"center",backgroundColor:colors.forest}, disabled:{opacity:0.6}, saveText:{color:colors.white,fontWeight:"900",fontSize:16} });
+function Indicator({ selected }) {
+  return (
+    <View style={[styles.radio, selected && styles.radioSelected]}>
+      {selected ? <View style={styles.radioDot} /> : null}
+    </View>
+  );
+}
+const styles = StyleSheet.create({
+  flex: { flex: 1, backgroundColor: colors.background },
+  content: { padding: spacing.lg, paddingBottom: spacing.xl * 2 },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  titleCopy: { flex: 1 },
+  eyebrow: {
+    color: colors.forest,
+    fontSize: 10,
+    fontWeight: "900",
+    letterSpacing: 1,
+    marginBottom: spacing.sm,
+  },
+  title: { fontSize: 25, fontWeight: "900", color: colors.primary },
+  subtitle: {
+    color: colors.muted,
+    fontSize: 14,
+    lineHeight: 21,
+    marginTop: spacing.sm,
+  },
+  loader: { marginTop: spacing.xl },
+  card: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.outlineVariant,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md,
+    shadowColor: "#0F172A",
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 2,
+  },
+  option: {
+    minHeight: 64,
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+  },
+  selected: { backgroundColor: colors.softGreen },
+  optionText: {
+    color: colors.primary,
+    fontSize: 15,
+    fontWeight: "700",
+    marginLeft: spacing.md,
+  },
+  radio: {
+    width: 24,
+    height: 24,
+    borderRadius: radius.full,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  radioSelected: { borderColor: colors.accent },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: radius.full,
+    backgroundColor: colors.accent,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 7,
+    borderWidth: 2,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  checkboxSelected: {
+    backgroundColor: colors.accent,
+    borderColor: colors.accent,
+  },
+  check: { color: colors.white, fontWeight: "800", fontSize: 15 },
+  optional: {
+    color: colors.muted,
+    fontSize: 13,
+    fontWeight: "700",
+    marginBottom: spacing.sm,
+  },
+  inputWrap: {
+    height: 58,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+  },
+  currency: {
+    color: colors.forest,
+    fontWeight: "800",
+    fontSize: 15,
+    paddingRight: spacing.sm,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  input: {
+    flex: 1,
+    color: colors.primary,
+    fontSize: 16,
+    paddingLeft: spacing.md,
+  },
+  priorityCard: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    flexDirection: "row",
+    marginBottom: spacing.sm,
+  },
+  prioritySelected: {
+    backgroundColor: colors.softGreen,
+    borderColor: colors.accent,
+  },
+  priorityCopy: { flex: 1, marginLeft: spacing.md },
+  priorityHeading: {
+    color: colors.forest,
+    fontSize: 12,
+    fontWeight: "900",
+    letterSpacing: 1,
+  },
+  priorityLine: {
+    color: colors.primary,
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 4,
+  },
+  priorityDetail: { color: colors.muted, fontSize: 13, marginTop: 3 },
+  error: { color: colors.danger, lineHeight: 19, marginTop: spacing.md },
+  success: { color: colors.success, fontWeight: "700", marginTop: spacing.md },
+  actions: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
+  clear: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.card,
+  },
+  clearText: { color: colors.muted, fontWeight: "800" },
+  save: {
+    flex: 1,
+    borderRadius: radius.md,
+    minHeight: 52,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.forest,
+  },
+  disabled: { opacity: 0.6 },
+  saveText: { color: colors.white, fontWeight: "900", fontSize: 16 },
+});

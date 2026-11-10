@@ -44,7 +44,7 @@ export default function AIChatHeader({
             AI Ride Assistant
           </Text>
           <Text style={styles.subtitle} numberOfLines={1}>
-            Grounded in your FareRide data
+            Grounded in your FairFare data
           </Text>
         </View>
         <IconButton
@@ -95,7 +95,12 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   heading: { flex: 1, alignItems: "center", paddingHorizontal: spacing.sm },
-  title: { color: colors.primary, fontSize: 18, fontWeight: "900", letterSpacing: -0.2 },
+  title: {
+    color: colors.primary,
+    fontSize: 18,
+    fontWeight: "900",
+    letterSpacing: -0.2,
+  },
   subtitle: { color: colors.muted, fontSize: 10, marginTop: 2 },
   contextChip: {
     flexDirection: "row",

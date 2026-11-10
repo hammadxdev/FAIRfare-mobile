@@ -12,6 +12,7 @@ test("comparison preserves the POST contract, JSON payload, and response.data na
   assert.match(apiSource, /timeout: COMPARISON_TIMEOUT_MS/);
   assert.match(homeSource, /const response = await compareFares\(payload/);
   assert.match(homeSource, /navigation\.navigate\("Results", \{ result: \{ \.\.\.response\.data/);
+  assert.doesNotMatch(homeSource, /fetchNearbyDrivers|nearbyRequestStore|nearbyRequestKey/);
 });
 
 test("comparison has a bounded dedicated timeout and does not alter the shared client timeout", () => {

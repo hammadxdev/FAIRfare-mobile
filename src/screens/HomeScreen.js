@@ -24,8 +24,6 @@ import LoadingOverlay from "../components/LoadingOverlay";
 import ErrorState from "../components/ErrorState";
 import mockLocations, { ENABLE_MOCK_LOCATION_FALLBACK } from "../constants/mockLocations";
 import { compareFares, createSavedRoute, getProviderStatus } from "../services/api";
-import { fetchNearbyDrivers } from "../services/nearbyDrivers";
-const { nearbyRequestStore } = require("../utils/comparisonResults.cjs");
 import { autocompletePlaces, autocompleteDestination, getPlaceDetails, reverseGeocode, computeRoute } from "../services/maps.service";
 import { getCurrentLocation } from "../services/location.service";
 import { canCompareFares, hasValidCoordinates, isSameLocation } from "../utils/validators";
@@ -128,7 +126,7 @@ export default function HomeScreen({ navigation, route }) {
   }, [webKeyboardInset]);
   useEffect(() => {
     if (Platform.OS !== "web" || !IS_DEVELOPMENT) return undefined;
-    const timer = setTimeout(() => console.info("[layout] FairRide web dimensions", collectWebLayoutDiagnostics()), 0);
+    const timer = setTimeout(() => console.info("[layout] FairFare web dimensions", collectWebLayoutDiagnostics()), 0);
     return () => clearTimeout(timer);
   }, [webKeyboardInset, sheetExpanded]);
   const sheetHandleResponder = useMemo(() => PanResponder.create({
@@ -392,7 +390,7 @@ export default function HomeScreen({ navigation, route }) {
         if (err?.code === "PROVIDER_AUTH_REQUIRED" || err?.response?.status === 401) {
           setSuggestions([]);
           setStatusType("error");
-          setStatus("Your FareRide session cannot load live location suggestions. Please sign in again.");
+          setStatus("Your FairFare session cannot load live location suggestions. Please sign in again.");
         } else if (ENABLE_MOCK_LOCATION_FALLBACK) {
           const results = filterMockLocations(query);
           setSuggestions(results);
@@ -985,11 +983,6 @@ export default function HomeScreen({ navigation, route }) {
       });
     }
 
-    const nearbyRequestKey = `${compareRequestId}:${Date.now()}`;
-    nearbyRequestStore.begin(nearbyRequestKey, { latitude: pickup.lat, longitude: pickup.lng });
-    void fetchNearbyDrivers(pickup, { signal: abortController.signal, onProviderResult: (providerId, records) => nearbyRequestStore.settle(nearbyRequestKey, providerId, records) })
-      .then((snapshot) => nearbyRequestStore.finish(nearbyRequestKey, snapshot))
-      .catch(() => nearbyRequestStore.finish(nearbyRequestKey, { pickup: { latitude: pickup.lat, longitude: pickup.lng } }));
     try {
       // The comparison request has its own bounded timeout; provider failures
       // are returned in the normalized response instead of fabricated here.
@@ -1010,7 +1003,7 @@ export default function HomeScreen({ navigation, route }) {
           quotes: quoteDiagnostics,
         });
       }
-      navigation.navigate("Results", { result: { ...response.data, quoteReceivedAt: Date.now(), nearbyDrivers: nearbyRequestStore.get(nearbyRequestKey), nearbyRequestKey } });
+      navigation.navigate("Results", { result: { ...response.data, quoteReceivedAt: Date.now() } });
     } catch (err) {
       abortController.abort();
       if (compareRequestIdRef.current !== compareRequestId || routeRequestIdRef.current !== routeRequestId) return;

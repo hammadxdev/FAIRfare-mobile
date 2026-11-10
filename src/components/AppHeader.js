@@ -5,7 +5,7 @@ import LogoMark from "./LogoMark";
 import colors, { spacing } from "../constants/colors";
 
 export default function AppHeader({
-  title = "FareRide",
+  title = "FairFare",
   subtitle = "Compare fares. Choose fair.",
   showLogo = true,
   compact = false,
